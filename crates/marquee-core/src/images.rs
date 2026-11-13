@@ -8,7 +8,7 @@ use crate::ctx::Ctx;
 use crate::error::{Error, Result};
 use crate::model::now;
 use crate::store;
-use rusqlite::{params, OptionalExtension};
+use rusqlite::params;
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 
@@ -56,17 +56,17 @@ pub async fn get(ctx: &Ctx, url: &str) -> Result<(Vec<u8>, String)> {
     }
     let k = key(url);
     let file = path(ctx, &k);
-    let cached: Option<(String, String)> = ctx.db.lock().query_row("SELECT mime, last_access FROM image_cache WHERE key = ?1", [&k], |r| Ok((r.get(0)?, r.get(1)?))).optional()?;
-    if let Some((mime, last)) = cached {
-        if let Ok(bytes) = tokio::fs::read(&file).await {
-            // Touch at most once an hour: plenty for LRU, and it keeps scrolling from writing constantly.
-            if last.get(..13) != now().get(..13) {
-                let _ = ctx.db.lock().execute("UPDATE image_cache SET last_access = ?2 WHERE key = ?1", params![k, now()]);
+    // A cached image is served straight from disk: no database lookup, so artwork never waits
+    // behind a sync that is busy writing.
+    if let Ok(bytes) = tokio::fs::read(&file).await {
+        if let Some(mime) = sniff(&bytes) {
+            // LRU bookkeeping is best effort: skipped if the database is busy, and at most hourly.
+            if let Some(conn) = ctx.db.try_lock() {
+                let stamp = now();
+                let _ = conn.execute("UPDATE image_cache SET last_access = ?2 WHERE key = ?1 AND substr(last_access, 1, 13) != substr(?2, 1, 13)", params![k, stamp]);
             }
-            return Ok((bytes, mime));
+            return Ok((bytes, mime.to_string()));
         }
-        // The file was removed behind our back (disk cleanup): forget it and fetch again.
-        let _ = ctx.db.lock().execute("DELETE FROM image_cache WHERE key = ?1", [&k]);
     }
     let resp = ctx.http.get("Artwork", url).send().await?;
     let mime = sniff(&resp.body).ok_or_else(|| Error::msg("That address didn't return an image."))?.to_string();

@@ -118,9 +118,8 @@ pub async fn ensure_detail(ctx: &Ctx, item_id: i64) -> Result<()> {
 }
 
 async fn movie_or_show(ctx: &Ctx, item: &Item) -> Result<Option<ItemDraft>> {
-    if !ctx.has_key("tmdb") {
-        return Ok(None);
-    }
+    // Not "no match": the caller must know to try again once the key is added.
+    ctx.require_key("tmdb")?;
     // A MyAnimeList sequel season ("... Season 2") is news as itself. Matching it to its show on
     // TMDB would swap in the show's title and first-air date, so it keeps MAL's details.
     if item.data["mal_sequel"] == true && item.ext("tmdb").is_none() {

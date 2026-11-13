@@ -97,7 +97,7 @@ function Deck({ cards, onRated }: { cards: Card[]; onRated: (rated: number) => v
             exit="leave"
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
           >
-            <Art card={card} className="h-full w-full" eager />
+            <Art card={card} className="h-full w-full" eager large />
             <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/10 to-transparent" />
             <motion.div style={{ opacity: like }} className="absolute left-5 top-5 -rotate-12 rounded-lg border-[3px] border-good px-3 py-1 text-xl font-extrabold uppercase tracking-wider text-good">
               Loved it

@@ -221,7 +221,11 @@ pub async fn dispatch(ctx: &Arc<Ctx>, method: &str, p: Value) -> Result<Value> {
                 return Err(Error::msg("Marquee doesn't use a key by that name."));
             }
             match opt(&p, "value") {
-                Some(v) => c.secrets.set(&format!("key.{name}"), v.trim())?,
+                Some(v) => {
+                    c.secrets.set(&format!("key.{name}"), v.trim())?;
+                    // Titles skipped while this key was missing get looked up on the next sync.
+                    c.db.lock().execute("UPDATE items SET data = json_remove(data, '$.enrich_tried') WHERE json_extract(data, '$.enrich_tried') IS NOT NULL", [])?;
+                }
                 None => c.secrets.delete(&format!("key.{name}"))?,
             }
             json!(key_status(c))

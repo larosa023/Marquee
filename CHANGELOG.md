@@ -2,6 +2,20 @@
 
 All notable changes to Marquee are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.1.3
+
+### Faster, smoother artwork
+- Posters and covers fade in over a shimmer placeholder instead of popping in, and art that's already cached shows straight away.
+- Grids load TMDB's 342 px posters (sharp on high-DPI screens, about a third the size); detail pages and Quick Rate still use full-size art.
+- Cached images are served straight from disk without waiting on the database, so scrolling a full grid no longer stalls.
+- The hero and detail artwork are fetched first.
+
+### Missing posters and "TBA" dates fixed
+- Titles from your Letterboxd, Trakt and Steam history are now looked up eight at a time, and more of them are filled in each sync.
+- Titles skipped because a catalog key was missing were wrongly marked "not found" for a week. They are now retried on this update and whenever you add a key.
+- Saving a TMDB, IGDB or Last.fm key starts a sync at once.
+- Movies, TV, Games and Music show a banner with a shortcut to Settings → API keys when the key that fills them is missing.
+
 ## 0.1.2
 
 ### New

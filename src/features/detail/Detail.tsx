@@ -417,7 +417,7 @@ export default function Detail({ id }: { id: number }) {
         <div className="relative mx-auto max-w-6xl px-(--pad) pb-24 pt-[12vh]">
           <div className="flex flex-col gap-9 md:flex-row md:items-end">
             <motion.div layoutId={origin ? `art-${origin}-${id}` : undefined} className="shadow-card w-56 shrink-0 overflow-hidden rounded-card bg-surface md:w-64" transition={{ type: 'spring', stiffness: 260, damping: 30 }}>
-              {card ? <Art card={{ title, poster, media }} className={cx('w-full', media !== 'album' && 'aspect-2/3')} eager /> : <Skeleton className="aspect-2/3 w-full" />}
+              {card ? <Art card={{ title, poster, media }} className={cx('w-full', media !== 'album' && 'aspect-2/3')} eager large /> : <Skeleton className="aspect-2/3 w-full" />}
             </motion.div>
 
             <motion.div className="min-w-0 flex-1" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08, duration: 0.3 }}>

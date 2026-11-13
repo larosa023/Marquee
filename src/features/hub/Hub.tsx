@@ -94,6 +94,15 @@ export default function Hub({ media }: { media: Media }) {
     <>
       <PageHeader title={copy.title} subtitle={copy.subtitle} />
       {offline && <OfflineBanner />}
+      {!keySet && cards.length > 0 && (
+        <div role="status" className="mx-(--pad) mb-4 flex flex-wrap items-center gap-2.5 rounded-control bg-warn/12 px-3.5 py-2 text-[13px] text-warn">
+          <Icon name="plug" size={16} />
+          <span className="flex-1">Posters, release dates and details need one more key. {copy.keyHint}</span>
+          <Button size="sm" onClick={() => navigate('/settings/keys')}>
+            Open API keys
+          </Button>
+        </div>
+      )}
       {media === 'tv' && <Tracking />}
       <FilterBar value={filters} onChange={setFilters} media={media} platforms={platforms} hasServices={hasServices} />
       {q.isPending ? (

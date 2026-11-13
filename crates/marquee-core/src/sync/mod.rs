@@ -349,7 +349,10 @@ pub async fn enrich(ctx: &Ctx, budget: usize) -> Result<usize> {
         }
     }
 
-    let (mut screen, mut music, mut games) = (budget, budget / 2, 20usize);
+    // Pick this run's share per medium, then fetch several at once (TMDB allows ~50 a second;
+    // the shared scheduler keeps every host inside its own limit).
+    let (mut screen, mut music, mut games) = (budget, budget / 2, 40usize);
+    let mut todo = vec![];
     for (id, media) in &stubs {
         let allowance = match media.as_str() {
             "movie" | "tv" => &mut screen,
@@ -359,23 +362,42 @@ pub async fn enrich(ctx: &Ctx, budget: usize) -> Result<usize> {
         if *allowance == 0 {
             continue;
         }
-        let still_stub: bool = ctx.db.lock().query_row("SELECT NOT EXISTS (SELECT 1 FROM item_features f WHERE f.item_id = ?1 AND (f.feature LIKE 'g:%' OR f.feature LIKE 't:%'))", [id], |r| r.get(0)).unwrap_or(true);
-        if !still_stub {
-            continue;
-        }
         *allowance -= 1;
-        let result = match media.as_str() {
-            "album" => light_album(ctx, *id).await,
-            _ => catalog::ensure_detail(ctx, *id).await,
-        };
+        todo.push((*id, media.clone()));
+    }
+    use futures::StreamExt;
+    let results: Vec<(i64, Result<()>)> = futures::stream::iter(todo)
+        .map(|(id, media)| async move {
+            let still_stub: bool = ctx.db.lock().query_row("SELECT NOT EXISTS (SELECT 1 FROM item_features f WHERE f.item_id = ?1 AND (f.feature LIKE 'g:%' OR f.feature LIKE 't:%'))", [id], |r| r.get(0)).unwrap_or(true);
+            if !still_stub {
+                return (id, Ok(()));
+            }
+            let result = match media.as_str() {
+                "album" => light_album(ctx, id).await,
+                _ => catalog::ensure_detail(ctx, id).await,
+            };
+            (id, result)
+        })
+        .buffer_unordered(8)
+        .collect()
+        .await;
+    let mut offline = None;
+    for (id, result) in results {
         match result {
             Ok(()) => done += 1,
-            Err(e) if e.is_offline() => return Err(e),
-            Err(Error::NotConfigured(_)) => {}
+            Err(e) if e.is_offline() => {
+                offline = Some(e);
+                continue;
+            }
+            // A missing key isn't a miss: leave the item to be tried as soon as the key is added.
+            Err(Error::NotConfigured(_)) => continue,
             Err(e) => tracing::debug!("couldn't enrich item {id}: {e}"),
         }
         // Remember the attempt so an unmatchable title isn't retried on every sync.
         ctx.db.lock().execute("UPDATE items SET data = json_set(data, '$.enrich_tried', ?1) WHERE id = ?2", rusqlite::params![now(), id])?;
+    }
+    if let Some(e) = offline {
+        return Err(e);
     }
     Ok(done)
 }
@@ -510,7 +532,7 @@ pub async fn run(ctx: &Ctx, only: Option<&str>) -> Result<SyncReport> {
 
     if !report.offline {
         progress(ctx, "Learning your taste", 0.72);
-        match enrich(ctx, 250).await {
+        match enrich(ctx, 800).await {
             Err(e) if e.is_offline() => report.offline = true,
             Err(e) => report.warnings.push(e.to_string()),
             Ok(_) => {}

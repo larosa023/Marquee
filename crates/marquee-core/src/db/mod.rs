@@ -8,7 +8,7 @@ use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-pub const MIGRATIONS: &[(u32, &str)] = &[(1, include_str!("migrations/0001_init.sql")), (2, include_str!("migrations/0002_myanimelist.sql"))];
+pub const MIGRATIONS: &[(u32, &str)] = &[(1, include_str!("migrations/0001_init.sql")), (2, include_str!("migrations/0002_myanimelist.sql")), (3, include_str!("migrations/0003_retry_details.sql"))];
 
 #[derive(Clone)]
 pub struct Db {
@@ -45,6 +45,16 @@ impl Db {
     /// The connection. Hold it only for the length of one query or transaction, never across `.await`.
     pub fn lock(&self) -> MutexGuard<'_, Connection> {
         self.conn.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// The connection if nobody else holds it right now. For optional bookkeeping that must never
+    /// make the caller wait (artwork served while a sync is writing).
+    pub fn try_lock(&self) -> Option<MutexGuard<'_, Connection>> {
+        match self.conn.try_lock() {
+            Ok(g) => Some(g),
+            Err(std::sync::TryLockError::Poisoned(e)) => Some(e.into_inner()),
+            Err(std::sync::TryLockError::WouldBlock) => None,
+        }
     }
 
     /// Flushes the WAL into the main file so the database can be copied as a single file.

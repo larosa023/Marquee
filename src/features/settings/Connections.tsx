@@ -551,7 +551,10 @@ const KEY_LABEL: Record<string, string> = {
   mal_client_secret: 'MyAnimeList client secret',
 };
 
+const CATALOG_KEYS = ['tmdb', 'igdb_client_id', 'igdb_client_secret', 'lastfm_key'];
+
 function KeyRow({ k }: { k: KeyStatus }) {
+  const qc = useQueryClient();
   const toast = useApp((s) => s.toast);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
@@ -559,6 +562,8 @@ function KeyRow({ k }: { k: KeyStatus }) {
     try {
       await api('keys.set', { name: k.name, value: v });
       await useApp.getState().refreshBoot();
+      // A catalog key unlocks posters, dates and details: fetch them right away.
+      if (v && CATALOG_KEYS.includes(k.name)) void api('sync').finally(() => refreshFeeds(qc));
       toast(v ? `${KEY_LABEL[k.name] ?? k.name} saved to Windows Credential Manager` : k.built_in ? 'Back to the built-in key' : 'Key removed', 'good');
       setEditing(false);
       setValue('');

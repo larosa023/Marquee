@@ -50,9 +50,20 @@ export function TypeBadge({ card }: { card: Pick<CardData, 'media' | 'meta'> }) 
 }
 
 /** Poster or cover art with a designed fallback: a tinted tile with the title, never a broken image. */
-export function Art({ card, className, eager }: { card: Pick<CardData, 'title' | 'poster' | 'media'>; className?: string; eager?: boolean }) {
+/** Grid cards are ~180px wide: TMDB's 342px poster is sharp at 2x and a third the size of w500. */
+export function sized(url: string | null | undefined, large?: boolean): string | null | undefined {
+  if (!url || large) return url;
+  return url.replace('image.tmdb.org/t/p/w500/', 'image.tmdb.org/t/p/w342/').replace('image.tmdb.org/t/p/original/', 'image.tmdb.org/t/p/w342/');
+}
+
+export function Art({ card, className, eager, large }: { card: Pick<CardData, 'title' | 'poster' | 'media'>; className?: string; eager?: boolean; large?: boolean }) {
   const [failed, setFailed] = useState(false);
-  const src = img(card.poster);
+  const [loaded, setLoaded] = useState(false);
+  const src = img(sized(card.poster, large));
+  // Cached art is often ready before React attaches onLoad; catch that so it never stays hidden.
+  const ref = (el: HTMLImageElement | null) => {
+    if (el?.complete && el.naturalWidth > 0 && !loaded) setLoaded(true);
+  };
   if (!src || failed) {
     return (
       <div className={cx('flex flex-col items-center justify-center gap-2 bg-linear-to-br from-strong to-surface p-3 text-center text-faint', className)}>
@@ -66,11 +77,39 @@ export function Art({ card, className, eager }: { card: Pick<CardData, 'title' |
     return (
       <div className={cx('relative overflow-hidden bg-surface', className)}>
         <img src={src} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-150 object-cover opacity-60 blur-xl" loading="lazy" />
-        <img src={src} alt="" crossOrigin="anonymous" className="relative aspect-square w-full object-cover shadow-lg" loading={eager ? 'eager' : 'lazy'} decoding="async" onError={() => setFailed(true)} />
+        {!loaded && <div className="skeleton absolute inset-0 rounded-none" aria-hidden="true" />}
+        <img
+          ref={ref}
+          src={src}
+          alt=""
+          crossOrigin="anonymous"
+          className={cx('relative aspect-square w-full object-cover shadow-lg transition-opacity duration-300', loaded ? 'opacity-100' : 'opacity-0')}
+          loading={eager ? 'eager' : 'lazy'}
+          fetchPriority={eager ? 'high' : 'auto'}
+          decoding="async"
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+        />
       </div>
     );
   }
-  return <img src={src} alt="" crossOrigin="anonymous" className={cx('object-cover', className)} loading={eager ? 'eager' : 'lazy'} decoding="async" onError={() => setFailed(true)} />;
+  return (
+    <div className={cx('relative overflow-hidden', className)}>
+      {!loaded && <div className="skeleton absolute inset-0 rounded-none" aria-hidden="true" />}
+      <img
+        ref={ref}
+        src={src}
+        alt=""
+        crossOrigin="anonymous"
+        className={cx('h-full w-full object-cover transition-opacity duration-300', loaded ? 'opacity-100' : 'opacity-0')}
+        loading={eager ? 'eager' : 'lazy'}
+        fetchPriority={eager ? 'high' : 'auto'}
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
 }
 
 interface PosterCardProps {
