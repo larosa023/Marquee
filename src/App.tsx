@@ -119,10 +119,14 @@ function useBoot() {
         if (itemsTimer) return;
         itemsTimer = setTimeout(() => {
           itemsTimer = undefined;
-          refreshFeeds(qc);
+          // Only Home's short rows pick up new posters mid-sync. Grids and the open title wait
+          // for the end, so nothing reshuffles or jumps under the pointer while you browse.
+          refreshFeeds(qc, ['home', 'today']);
         }, 2000);
       }),
       on('taste:updated', () => {
+        // A sync rescores several times; its sync:done refreshes once at the end instead.
+        if (app().sync.running) return;
         refreshFeeds(qc);
         void app().refreshBoot();
       }),

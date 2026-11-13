@@ -405,9 +405,10 @@ export default function Detail({ id }: { id: number }) {
       <div ref={scroller} tabIndex={-1} className="h-full overflow-y-auto overflow-x-hidden outline-none">
         {/* Backdrop: drifts and fades as the page scrolls, tinted with the art's own color. */}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-[72vh] overflow-hidden">
-          {backdrop && <motion.img src={img(backdrop)} alt="" className={cx('h-full w-full object-cover', media === 'album' && 'scale-125 blur-3xl')} style={{ y: backdropY, scale: backdropScale, opacity: backdropOpacity }} />}
+          {backdrop && <motion.img src={img(backdrop)} alt="" className={cx('h-full w-full object-cover', media === 'album' && 'scale-125 blur-3xl')} style={{ y: backdropY, scale: backdropScale, opacity: backdropOpacity, willChange: 'transform, opacity' }} />}
           <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, color-mix(in srgb, var(--bg) 35%, transparent) 0%, color-mix(in srgb, var(--bg) 72%, transparent) 55%, var(--bg) 100%)' }} />
-          <div className="absolute inset-0 opacity-35 mix-blend-soft-light" style={{ background: 'radial-gradient(80% 90% at 20% 30%, var(--accent), transparent 70%)' }} />
+          {/* A plain translucent tint: a blend mode here repainted the whole backdrop on every scroll frame. */}
+          <div className="absolute inset-0 opacity-[0.14]" style={{ background: 'radial-gradient(80% 90% at 20% 30%, var(--accent), transparent 70%)' }} />
         </div>
 
         <div className="drag sticky top-0 z-20 flex h-13 items-center justify-between px-3">

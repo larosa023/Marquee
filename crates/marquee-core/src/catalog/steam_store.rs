@@ -44,6 +44,116 @@ pub fn parse_store_date(text: &str) -> Option<String> {
     None
 }
 
+const ASSETS: &str = "https://shared.akamai.steamstatic.com/store_item_assets/";
+
+/// What Steam's store knows about an app at a glance: its name and real artwork addresses.
+/// Newer apps keep art under hashed folders, so `apps/<id>/library_600x900.jpg` 404s for them;
+/// only the store's asset list has the right path.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct StoreItem {
+    pub name: Option<String>,
+    pub poster: Option<String>,
+    pub header: Option<String>,
+    pub hero: Option<String>,
+    pub release_date: Option<String>,
+    pub coming_soon: Option<bool>,
+    pub release_text: Option<String>,
+    pub developers: Vec<String>,
+    pub publishers: Vec<String>,
+    pub overview: Option<String>,
+}
+
+fn asset(a: &Value, format: &str, key: &str) -> Option<String> {
+    let file = s(a, key)?;
+    Some(format!("{ASSETS}{}", format.replace("${FILENAME}", &file)))
+}
+
+/// Looks up names and artwork for many apps at once (100 per call) through the store's
+/// IStoreBrowseService/GetItems. Missing apps are simply absent from the map.
+pub async fn items(ctx: &Ctx, appids: &[String]) -> Result<std::collections::HashMap<String, StoreItem>> {
+    let mut out = std::collections::HashMap::new();
+    let cc = ctx.region().to_uppercase();
+    let key = ctx.key("steam");
+    for chunk in appids.chunks(100) {
+        let ids: Vec<Value> = chunk.iter().filter_map(|a| a.parse::<u64>().ok()).map(|a| json!({ "appid": a })).collect();
+        let input = json!({
+            "ids": ids,
+            "context": { "language": "english", "country_code": cc },
+            "data_request": { "include_assets": true, "include_release": true, "include_basic_info": true }
+        });
+        let input = input.to_string();
+        let mut q = vec![("input_json", input.as_str())];
+        if let Some(k) = &key {
+            q.push(("key", k.as_str()));
+        }
+        let v: Value = ctx.http.get("Steam store", "https://api.steampowered.com/IStoreBrowseService/GetItems/v1/").query(&q).ttl(24 * 3600).json().await?;
+        for it in arr(&v["response"], "store_items") {
+            let Some(appid) = s(it, "appid").or_else(|| s(it, "id")) else { continue };
+            if it["success"].as_i64().unwrap_or(1) != 1 {
+                continue;
+            }
+            let a = &it["assets"];
+            let format = s(a, "asset_url_format").unwrap_or_else(|| format!("steam/apps/{appid}/${{FILENAME}}"));
+            let rel = &it["release"];
+            let date = i(rel, "steam_release_date").or_else(|| i(rel, "original_release_date")).filter(|t| *t > 0).and_then(|t| chrono::DateTime::from_timestamp(t, 0)).map(|d| d.format("%Y-%m-%d").to_string());
+            let info = &it["basic_info"];
+            out.insert(
+                appid,
+                StoreItem {
+                    name: s(it, "name"),
+                    poster: asset(a, &format, "library_capsule_2x").or_else(|| asset(a, &format, "library_capsule")),
+                    header: asset(a, &format, "header"),
+                    hero: asset(a, &format, "library_hero").or_else(|| asset(a, &format, "page_background")),
+                    release_date: date,
+                    coming_soon: rel["is_coming_soon"].as_bool(),
+                    release_text: s(rel, "custom_release_date_message").or_else(|| s(rel, "coming_soon_display")),
+                    developers: arr(info, "developers").iter().filter_map(|d| s(d, "name")).collect(),
+                    publishers: arr(info, "publishers").iter().filter_map(|d| s(d, "name")).collect(),
+                    overview: s(info, "short_description"),
+                },
+            );
+        }
+    }
+    Ok(out)
+}
+
+/// Fills a game draft from a store item (name, art, date, studio) where the draft lacks them.
+pub fn apply(d: &mut ItemDraft, it: &StoreItem) {
+    if let Some(n) = &it.name {
+        d.title = n.clone();
+    }
+    if it.poster.is_some() {
+        d.poster = it.poster.clone();
+    }
+    if let Some(h) = &it.header {
+        d.set("header", h.clone());
+    }
+    if d.backdrop.is_none() {
+        d.backdrop = it.hero.clone().or_else(|| it.header.clone());
+    }
+    if d.release_date.is_none() {
+        d.release_date = it.release_date.clone();
+    }
+    if let Some(c) = it.coming_soon {
+        d.set("coming_soon", c);
+    }
+    if let Some(t) = &it.release_text {
+        d.set("release_text", t.clone());
+    }
+    if d.overview.is_none() {
+        d.overview = it.overview.clone();
+    }
+    if !d.data.contains_key("developer") {
+        if let Some(dev) = it.developers.first() {
+            d.set("developer", dev.clone());
+        }
+    }
+    if d.creators.is_empty() {
+        d.creators.extend(it.developers.iter().map(|n| Creator::new(n, "developer")));
+        d.creators.extend(it.publishers.iter().map(|n| Creator::new(n, "publisher")));
+    }
+}
+
 /// Store details for one app. Returns `None` for delisted or region-locked apps.
 pub async fn app_details(ctx: &Ctx, appid: &str) -> Result<Option<ItemDraft>> {
     let cc = ctx.region().to_lowercase();
@@ -58,8 +168,14 @@ pub async fn app_details(ctx: &Ctx, appid: &str) -> Result<Option<ItemDraft>> {
     d.detail_level = 1;
     d.tag_source = TagSource::Steam;
     d.overview = s(a, "short_description");
-    d.poster = Some(format!("https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900.jpg"));
     d.backdrop = s(a, "background_raw").or_else(|| s(a, "header_image"));
+    // appdetails has no portrait art; the asset list does (left unset if it can't be reached, so a
+    // poster already saved isn't replaced by a guess).
+    if let Ok(found) = items(ctx, &[appid.to_string()]).await {
+        if let Some(it) = found.get(appid) {
+            d.poster = it.poster.clone();
+        }
+    }
     d.set("header", s(a, "header_image"));
     d.genres = names(a, "genres", "description");
     d.tags = names(a, "categories", "description");
@@ -171,6 +287,32 @@ mod tests {
         assert_eq!(parse_store_date("2027").as_deref(), Some("2027-12-31"));
         assert_eq!(parse_store_date("Coming soon"), None);
         assert_eq!(parse_store_date("To be announced"), None);
+    }
+
+    #[tokio::test]
+    async fn store_items_give_names_and_the_real_hashed_artwork() {
+        let t = ctx();
+        t.net.on(
+            "IStoreBrowseService/GetItems",
+            200,
+            r#"{"response":{"store_items":[
+                {"item_type":0,"id":4928450,"success":1,"name":"Real Players","appid":4928450,
+                 "basic_info":{"short_description":"A game.","developers":[{"name":"REAL PLAYERS"}],"publishers":[{"name":"Pub"}]},
+                 "release":{"steam_release_date":1763596800,"is_coming_soon":true},
+                 "assets":{"asset_url_format":"steam/apps/4928450/9f3c1a/${FILENAME}?t=1","header":"header.jpg","library_capsule":"library_600x900.jpg","library_capsule_2x":"library_600x900_2x.jpg","library_hero":"library_hero.jpg"}},
+                {"item_type":0,"id":1,"success":2}
+            ]}}"#,
+        );
+        let found = items(&t.ctx, &["4928450".into(), "1".into()]).await.unwrap();
+        let it = &found["4928450"];
+        assert_eq!(it.name.as_deref(), Some("Real Players"));
+        assert_eq!(it.poster.as_deref(), Some("https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4928450/9f3c1a/library_600x900_2x.jpg?t=1"));
+        assert_eq!(it.release_date.as_deref(), Some("2025-11-20"));
+        assert!(!found.contains_key("1"), "a failed lookup is left out");
+        let mut d = ItemDraft::new(Media::Game, "Steam app 4928450");
+        apply(&mut d, it);
+        assert_eq!(d.title, "Real Players");
+        assert_eq!(d.data["developer"], "REAL PLAYERS");
     }
 
     #[tokio::test]

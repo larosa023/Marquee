@@ -1,6 +1,6 @@
 // The poster card every row and grid is made of, plus the match ring and the type badge.
 import { motion, useReducedMotion } from 'framer-motion';
-import { memo, useState, type MouseEvent } from 'react';
+import { memo, useEffect, useState, type MouseEvent } from 'react';
 import { credit, releaseLabel, typeBadge } from '@/lib/format';
 import { img } from '@/lib/img';
 import type { Card as CardData } from '@/lib/types';
@@ -56,10 +56,21 @@ export function sized(url: string | null | undefined, large?: boolean): string |
   return url.replace('image.tmdb.org/t/p/w500/', 'image.tmdb.org/t/p/w342/').replace('image.tmdb.org/t/p/original/', 'image.tmdb.org/t/p/w342/');
 }
 
-export function Art({ card, className, eager, large }: { card: Pick<CardData, 'title' | 'poster' | 'media'>; className?: string; eager?: boolean; large?: boolean }) {
-  const [failed, setFailed] = useState(false);
+export function Art({ card, className, eager, large }: { card: Pick<CardData, 'title' | 'poster' | 'media'> & { meta?: CardData['meta'] }; className?: string; eager?: boolean; large?: boolean }) {
+  // Steam's portrait art is missing for some games; its wide header art always exists.
+  const sources = [sized(card.poster, large), typeof card.meta?.header === 'string' ? card.meta.header : null].filter(Boolean) as string[];
+  const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState(false);
-  const src = img(sized(card.poster, large));
+  const failed = attempt >= sources.length;
+  const onError = () => {
+    setLoaded(false);
+    setAttempt((a) => a + 1);
+  };
+  useEffect(() => {
+    setAttempt(0);
+    setLoaded(false);
+  }, [card.poster]);
+  const src = img(sources[attempt]);
   // Cached art is often ready before React attaches onLoad; catch that so it never stays hidden.
   const ref = (el: HTMLImageElement | null) => {
     if (el?.complete && el.naturalWidth > 0 && !loaded) setLoaded(true);
@@ -77,7 +88,7 @@ export function Art({ card, className, eager, large }: { card: Pick<CardData, 't
     return (
       <div className={cx('relative overflow-hidden bg-surface', className)}>
         <img src={src} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-150 object-cover opacity-60 blur-xl" loading="lazy" />
-        {!loaded && <div className="skeleton absolute inset-0 rounded-none" aria-hidden="true" />}
+        {!loaded && <div className="absolute inset-0 bg-strong/60" aria-hidden="true" />}
         <img
           ref={ref}
           src={src}
@@ -88,26 +99,15 @@ export function Art({ card, className, eager, large }: { card: Pick<CardData, 't
           fetchPriority={eager ? 'high' : 'auto'}
           decoding="async"
           onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
+          onError={onError}
         />
       </div>
     );
   }
   return (
     <div className={cx('relative overflow-hidden', className)}>
-      {!loaded && <div className="skeleton absolute inset-0 rounded-none" aria-hidden="true" />}
-      <img
-        ref={ref}
-        src={src}
-        alt=""
-        crossOrigin="anonymous"
-        className={cx('h-full w-full object-cover transition-opacity duration-150', loaded ? 'opacity-100' : 'opacity-0')}
-        loading={eager ? 'eager' : 'lazy'}
-        fetchPriority={eager ? 'high' : 'auto'}
-        decoding="async"
-        onLoad={() => setLoaded(true)}
-        onError={() => setFailed(true)}
-      />
+      {!loaded && <div className="absolute inset-0 bg-strong/60" aria-hidden="true" />}
+      <img ref={ref} src={src} alt="" crossOrigin="anonymous" className={cx('h-full w-full object-cover transition-opacity duration-150', loaded ? 'opacity-100' : 'opacity-0')} loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : 'auto'} decoding="async" onLoad={() => setLoaded(true)} onError={onError} />
     </div>
   );
 }
@@ -123,6 +123,7 @@ interface PosterCardProps {
 
 export const PosterCard = memo(function PosterCard({ card, origin, onContext, width, showWhy }: PosterCardProps) {
   const openItem = useApp((s) => s.openItem);
+  const morph = useApp((s) => s.morphId === card.id && s.itemOrigin === origin);
   const quickAdd = useQuickAdd();
   const reduce = useReducedMotion();
   const sub = credit(card);
@@ -156,7 +157,7 @@ export const PosterCard = memo(function PosterCard({ card, origin, onContext, wi
           className="block w-full rounded-card text-left"
         >
           <motion.div
-            layoutId={`art-${origin}-${card.id}`}
+            layoutId={morph ? `art-${origin}-${card.id}` : undefined}
             className="shadow-card relative aspect-2/3 overflow-hidden rounded-card bg-surface transition-shadow duration-300 group-hover:shadow-[0_14px_40px_rgb(0_0_0/0.5),0_0_0_1px_color-mix(in_srgb,var(--accent)_45%,transparent),0_0_38px_color-mix(in_srgb,var(--accent)_calc(var(--glow)*38%),transparent)]"
           >
             <Art card={card} className="h-full w-full" />

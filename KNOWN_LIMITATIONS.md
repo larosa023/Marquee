@@ -8,6 +8,7 @@ Where a third-party service doesn't allow something, Marquee uses the best real 
 
 - **Adding to the wishlist is manual.** Steam has no supported way for an app to add to a wishlist. "Add to Steam wishlist" opens the game's store page in Steam (`steam://store/<appid>`, or the web store if Steam isn't installed) and marks the entry **Pending**. The next sync reads your wishlist and marks it **Synced** once the game is there.
 - **Private profiles share nothing.** If "Game details" is private, Steam returns an empty library. Marquee shows how to make it public (Steam → profile → Edit Profile → Privacy Settings) instead of an error.
+- **Game names and artwork come from an undocumented store endpoint.** Steam's wishlist API returns only app ids, and newer games keep their portrait art under hashed folders, so `apps/<id>/library_600x900.jpg` doesn't exist for them. Marquee reads names, dates, studios and the real art paths from `IStoreBrowseService/GetItems` (100 games per call), the same endpoint the Steam store uses. If Steam changes it, cards fall back to the game's wide header art and the store's per-game details.
 - **Hours per month aren't available for games.** Steam reports lifetime playtime and the last two weeks only, so Your Taste shows those two figures rather than a monthly chart for games.
 - **Lowest price** is the lowest Marquee itself has seen unless you add an IsThereAnyDeal key, which supplies the all-time low.
 

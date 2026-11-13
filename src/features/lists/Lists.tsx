@@ -360,6 +360,7 @@ type SortKey = 'custom' | 'added' | 'title' | 'release' | 'match';
 
 function EntryRow({ entry, index, total, listId, mirrored, selecting, selected, onToggle, canReorder, onMove }: { entry: ListEntry; index: number; total: number; listId: number; mirrored: boolean; selecting: boolean; selected: boolean; onToggle: () => void; canReorder: boolean; onMove: (dir: -1 | 1) => void }) {
   const openItem = useApp((s) => s.openItem);
+  const morph = useApp((s) => s.morphId === entry.id && s.itemOrigin === `list-${listId}`);
   const controls = useDragControls();
   const sync = SYNC[entry.sync_state];
   const sub = credit(entry);
@@ -393,7 +394,7 @@ function EntryRow({ entry, index, total, listId, mirrored, selecting, selected, 
         )
       )}
       <button type="button" className="flex min-w-0 flex-1 items-center gap-3.5 text-left" onClick={() => (selecting ? onToggle() : openItem(entry.id, `list-${listId}`))} aria-label={selecting ? undefined : `Open ${entry.title}`}>
-        <motion.span layoutId={`art-list-${listId}-${entry.id}`} className="block h-18 w-12 shrink-0 overflow-hidden rounded-md bg-strong">
+        <motion.span layoutId={morph ? `art-list-${listId}-${entry.id}` : undefined} className="block h-18 w-12 shrink-0 overflow-hidden rounded-md bg-strong">
           <Art card={entry} className={cx('w-full', entry.media === 'album' ? 'h-full' : 'h-full')} />
         </motion.span>
         <span className="min-w-0 flex-1">

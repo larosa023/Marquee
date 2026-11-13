@@ -54,6 +54,9 @@ interface AppState {
   item: number | null;
   /** Where the poster morph should start from, so the same title in two rows animates from the one clicked. */
   itemOrigin: string | null;
+  /** The one title whose poster morphs into the detail page. Only it carries a layoutId, so a
+   * grid of a hundred cards isn't measured on every render. */
+  morphId: number | null;
   paletteOpen: boolean;
   notificationsOpen: boolean;
   sidebarCollapsed: boolean;
@@ -95,6 +98,7 @@ export const useApp = create<AppState>((set, get) => ({
   sys: null,
   ...parseHash(typeof location === 'undefined' ? '' : location.hash),
   itemOrigin: null,
+  morphId: null,
   paletteOpen: false,
   notificationsOpen: false,
   sidebarCollapsed: false,
@@ -123,7 +127,7 @@ export const useApp = create<AppState>((set, get) => ({
     location.hash = toHash({ path, item: null });
   },
   openItem: (id, origin) => {
-    set({ itemOrigin: origin ?? null });
+    set({ itemOrigin: origin ?? null, morphId: id });
     location.hash = toHash({ path: get().path, item: id });
   },
   closeItem: () => {

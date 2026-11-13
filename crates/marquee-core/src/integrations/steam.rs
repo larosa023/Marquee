@@ -134,9 +134,24 @@ impl Source for Steam {
             // A private profile answers with an empty object, not an error.
             out.warnings.push(PRIVATE_HELP.to_string());
         }
+        // Names and real artwork for every game in one batch per hundred.
+        let wl: Value = ctx.http.get("Steam", format!("{API}/IWishlistService/GetWishlist/v1/")).query(&[("key", &key), ("steamid", &steamid)]).json().await.unwrap_or(Value::Null);
+        let mut appids: Vec<String> = games.iter().filter_map(|g| s(g, "appid")).collect();
+        appids.extend(arr(&wl["response"], "items").iter().filter_map(|it| s(it, "appid")));
+        let store = crate::catalog::steam_store::items(ctx, &appids).await.unwrap_or_else(|e| {
+            tracing::debug!("couldn't read Steam store art: {e}");
+            Default::default()
+        });
+        let draft_for = |appid: &str, name: Option<String>| {
+            let mut d = game_draft(appid, name);
+            if let Some(it) = store.get(appid) {
+                crate::catalog::steam_store::apply(&mut d, it);
+            }
+            d
+        };
         for g in games {
             let Some(appid) = s(g, "appid") else { continue };
-            let draft = game_draft(&appid, s(g, "name"));
+            let draft = draft_for(&appid, s(g, "name"));
             let minutes = f(g, "playtime_forever").unwrap_or(0.0);
             let last = i(g, "rtime_last_played").filter(|t| *t > 0).and_then(unix_to_rfc3339);
             out.events.push(RawEvent::new(draft.clone(), EventKind::Owned, 1.0).at(last.clone()));
@@ -148,11 +163,10 @@ impl Source for Steam {
         }
 
         // The wishlist moved to IWishlistService in late 2024; the old store JSON endpoint is gone.
-        let wl: Value = ctx.http.get("Steam", format!("{API}/IWishlistService/GetWishlist/v1/")).query(&[("key", &key), ("steamid", &steamid)]).json().await.unwrap_or(Value::Null);
         let mut wishlist = vec![];
         for item in arr(&wl["response"], "items") {
             let Some(appid) = s(item, "appid") else { continue };
-            let draft = game_draft(&appid, None);
+            let draft = draft_for(&appid, None);
             let added = i(item, "date_added").and_then(unix_to_rfc3339);
             out.events.push(RawEvent::new(draft.clone(), EventKind::Wishlist, 1.0).at(added));
             wishlist.push(draft);

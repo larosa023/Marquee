@@ -2,6 +2,18 @@
 
 All notable changes to Marquee are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.1.6
+
+### Smoother browsing
+- Grids and detail pages no longer stutter or jump. Every card carried a shared-element animation id, so a grid of a hundred cards was re-measured on every update and cards slid around when the order changed. Now only the card you open morphs into its detail page.
+- Nothing reshuffles while a sync runs: grids and the open title refresh once when the sync finishes (Home's short rows still fill in as posters arrive). Before, every batch of posters and every rescore reloaded the page you were on.
+- The detail page's backdrop is much cheaper to scroll: the blended tint layer that repainted on every scroll frame is now a plain translucent gradient, and the parallax image is GPU-composited.
+- Image placeholders are a still tint instead of an animated shimmer behind every poster.
+
+### Steam games show their real names and art
+- Wishlist games that showed as "Steam app 4928450" now get their name, release date, studio and artwork, looked up 100 at a time from the Steam store on every Steam sync.
+- Newer games keep their portrait art under a different address. Marquee now reads the right one, and falls back to the game's wide header art if Steam has none.
+
 ## 0.1.5
 
 ### Surprise me

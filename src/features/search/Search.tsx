@@ -27,11 +27,12 @@ function useDebounced<T>(value: T, ms: number): T {
 
 function ResultRow({ card, active, origin, onHover, id }: { card: Card; active: boolean; origin: string; onHover: () => void; id: string }) {
   const openItem = useApp((s) => s.openItem);
+  const morph = useApp((s) => s.morphId === card.id && s.itemOrigin === origin);
   const sub = credit(card);
   return (
     <li id={id} role="option" aria-selected={active}>
       <button type="button" tabIndex={-1} onMouseMove={onHover} onClick={() => openItem(card.id, origin)} className={cx('flex w-full items-center gap-3.5 rounded-card p-2 pr-3 text-left transition-colors', active ? 'bg-hover' : 'hover:bg-hover')}>
-        <motion.span layoutId={`art-${origin}-${card.id}`} className="block h-18 w-12 shrink-0 overflow-hidden rounded-md bg-strong">
+        <motion.span layoutId={morph ? `art-${origin}-${card.id}` : undefined} className="block h-18 w-12 shrink-0 overflow-hidden rounded-md bg-strong">
           <Art card={card} className="h-full w-full" />
         </motion.span>
         <span className="min-w-0 flex-1">

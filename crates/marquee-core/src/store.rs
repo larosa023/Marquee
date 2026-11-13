@@ -260,7 +260,7 @@ pub fn card_from_row(r: &Row) -> rusqlite::Result<Card> {
     let data: Value = serde_json::from_str(&r.get::<_, String>(13)?).unwrap_or(Value::Null);
     let why: Vec<String> = r.get::<_, Option<String>>(12)?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
     let mut meta = Map::new();
-    for key in ["artist", "price", "discount", "platforms", "providers", "next_episode", "album_type", "status", "deck", "low", "seasons_count", "network", "developer", "director", "trailer", "spotify_url", "store_url"] {
+    for key in ["artist", "price", "discount", "platforms", "providers", "next_episode", "album_type", "status", "deck", "low", "seasons_count", "network", "developer", "director", "trailer", "spotify_url", "store_url", "header"] {
         if let Some(v) = data.get(key).filter(|v| !v.is_null()) {
             meta.insert(key.into(), v.clone());
         }
