@@ -10,3 +10,8 @@ playwright-report/
 coverage/
 .DS_Store
 *.marqueebackup
+
+# Test and mock builds
+dist-mock
+test-results
+playwright-report
