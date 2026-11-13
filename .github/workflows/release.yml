@@ -132,7 +132,7 @@ jobs:
           Compress-Archive -Path "$dir/*" -DestinationPath "Marquee_${version}_x64-portable.zip" -Force
           gh release upload $tag "Marquee_${version}_x64-portable.zip" --clobber
 
-          gh release edit $tag --notes-file release-notes.md
+          gh release edit $tag --title "Marquee v$version" --notes-file release-notes.md
 
           # The beta channel reads a fixed URL: releases/download/beta-channel/latest.json.
           # It always points at the newest build of any kind, so beta users also get stable releases.

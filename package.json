@@ -1,7 +1,7 @@
 {
   "name": "marquee",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "New movies, shows, games and albums, picked for your taste.",
   "type": "module",
   "scripts": {

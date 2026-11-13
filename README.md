@@ -122,8 +122,8 @@ The Release workflow builds the installer, MSI and portable zip, signs the updat
 ### Testing the updater
 
 1. `npm run set-version -- 0.0.9`, then `npm run tauri build` with `TAURI_SIGNING_PRIVATE_KEY` (and its password) set in your shell. Install the resulting `Marquee_0.0.9_x64-setup.exe`. Don't commit the version change.
-2. Publish v0.1.0 as above.
-3. Open the installed 0.0.9: within a few seconds an "Update ready" pill appears in the top bar. Choose "Install now"; Marquee restarts as 0.1.0 on the screen you were on. Settings → Updates then shows "Roll back" to 0.0.9.
+2. Publish the new version as above.
+3. Open the installed 0.0.9: within a few seconds an "Update ready" pill appears in the top bar. Choose "Install now"; Marquee restarts as the new version on the screen you were on. Settings → Updates then shows "Roll back" to 0.0.9.
 
 ## Hangar
 

@@ -2,9 +2,9 @@
 
 All notable changes to Marquee are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
-## 0.1.0
+## 0.1.1
 
-The first release.
+The first release. (There is no 0.1.0 build: that tag was taken before the code was ready.)
 
 ### Your feed
 

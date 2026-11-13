@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Marquee",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "com.larosa023.marquee",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -62,7 +62,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_WITH_YOUR_TAURI_UPDATER_PUBLIC_KEY",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDREREEzNUIyQkIzMzg0ODMKUldTRGhETzdzalhhVGJFRldlL0ZFdXR6ZngxVWFEc2Q0YkZKZ0s2NUFjWUh0c0hyeFdvYks2VkoK",
       "endpoints": ["https://github.com/larosa023/Marquee/releases/latest/download/latest.json"],
       "windows": { "installMode": "passive" }
     }

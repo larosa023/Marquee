@@ -68,10 +68,10 @@ Spotify's February 2026 rules for personal ("development mode") apps shape what 
 
 ## Not yet verified
 
-v0.1.0 was written on Linux build machines without a Windows desktop, real accounts or API keys. That means:
+The first release (0.1.1) was written on Linux build machines without a Windows desktop, real accounts or API keys. That means:
 
 - **The app has not been run on Windows by its author.** The Windows-only code (Credential Manager storage, registry reads for the accent color and Hangar detection, the Hangar named pipe, the tray panel, toasts, Mica, autostart, the installer) compiles and passes its tests on GitHub's `windows-latest` runner, but nobody has yet clicked through it on a real desktop. Expect to find and fix a few things on first launch.
 - **No live API calls were made.** Every API client is tested against hand-written fixtures that follow each service's documented response shapes, not against recorded live responses. A field that differs in practice will show up as a missing detail or a sync warning, and is a small fix in that service's module.
 - **Performance targets (under 150 MB idle, cold start under 1.5 s) are unmeasured.** The design aims at them (lazy-loaded screens, a small first chunk, the window released after five minutes in the tray), but they need measuring on Windows.
-- **The updater's 0.0.9 → 0.1.0 upgrade and automatic rollback have not been exercised end to end**; README → "Testing the updater" has the steps.
+- **The updater's upgrade from a test 0.0.9 build and automatic rollback have not been exercised end to end**; README → "Testing the updater" has the steps.
 - **Hangar integration** follows the protocol as read from the Hangar source, and was not tested against a running Hangar.
