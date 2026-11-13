@@ -1,0 +1,143 @@
+# Builds Marquee for Windows and publishes a GitHub Release when a version tag is pushed.
+#
+#   git tag v0.1.0 && git push origin v0.1.0        a stable release
+#   git tag v0.2.0-beta.1 && git push origin ...    a beta (marked "pre-release")
+#
+# The release carries:
+#   Marquee_<version>_x64-setup.exe   the installer (NSIS, per-user, no admin prompt)
+#   Marquee_<version>_x64_en-US.msi   the same app as an MSI
+#   Marquee_<version>_x64-portable.zip  no install; keeps its data next to the exe
+#   latest.json + .sig files          what the in-app updater reads and verifies
+#
+# Secrets it needs are listed in README.md → "Releasing".
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      # App-level keys are baked into the build (see src-tauri/build.rs). Any that are missing
+      # simply mean users add their own in Settings → API keys.
+      TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+      IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
+      IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
+      LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+      LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
+      SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+      TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+      TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+      STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+      ITAD_API_KEY: ${{ secrets.ITAD_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the version
+        id: v
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          $conf = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          if ($version -ne $conf) { throw "Tag v$version doesn't match the version in tauri.conf.json ($conf). Run: npm run set-version -- $version" }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$(($version -match '-').ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
+      - name: Check the signing setup
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw "The TAURI_SIGNING_PRIVATE_KEY secret is missing. Run scripts/setup-signing.ps1 and add it (README → Releasing)." }
+          if ((Get-Content src-tauri/tauri.conf.json -Raw) -match 'REPLACE_WITH_YOUR_TAURI_UPDATER_PUBLIC_KEY') { throw "tauri.conf.json still has the placeholder updater public key. Run scripts/setup-signing.ps1 and commit the result." }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+      - run: npm ci
+
+      - name: Tests
+        run: |
+          npm run typecheck
+          npm test
+          npm run build
+          cargo test --workspace
+
+      # Optional: Authenticode. Without a certificate the installer still works, but Windows
+      # SmartScreen warns on first run. With WINDOWS_CERTIFICATE (a base64 .pfx) set, every exe
+      # and installer is signed.
+      - name: Import the code-signing certificate
+        id: cert
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:WINDOWS_CERTIFICATE) { "signed=false" >> $env:GITHUB_OUTPUT; Write-Host "::warning::No WINDOWS_CERTIFICATE secret: the installer will not be Authenticode-signed (updates are still signed and verified)."; exit 0 }
+          $pfx = Join-Path $env:RUNNER_TEMP 'cert.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password (ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force)
+          Remove-Item $pfx
+          $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $conf.bundle.windows | Add-Member -NotePropertyName certificateThumbprint -NotePropertyValue $cert.Thumbprint -Force
+          $conf.bundle.windows | Add-Member -NotePropertyName digestAlgorithm -NotePropertyValue 'sha256' -Force
+          $conf.bundle.windows | Add-Member -NotePropertyName timestampUrl -NotePropertyValue 'http://timestamp.digicert.com' -Force
+          $conf | ConvertTo-Json -Depth 32 | Set-Content src-tauri/tauri.conf.json
+          "signed=true" >> $env:GITHUB_OUTPUT
+
+      - name: Release notes from the changelog
+        shell: pwsh
+        run: node scripts/release-notes.mjs "${{ steps.v.outputs.version }}" > release-notes.md
+
+      - name: Build, sign and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: .
+          tagName: v__VERSION__
+          releaseName: 'Marquee v__VERSION__'
+          releaseBody: ${{ format('See CHANGELOG.md for what changed in {0}.', steps.v.outputs.version) }}
+          releaseDraft: false
+          prerelease: ${{ steps.v.outputs.prerelease }}
+          includeUpdaterJson: true
+          # The updater installs the NSIS build; the MSI is for people who prefer one.
+          updaterJsonPreferNsis: true
+
+      - name: Portable build, release notes and the beta channel
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = "${{ steps.v.outputs.version }}"
+          $tag = "v$version"
+
+          # Portable: the same exe plus a marker file that tells Marquee to keep its data beside it.
+          $dir = "Marquee-portable"
+          New-Item -ItemType Directory -Force -Path "$dir/data" | Out-Null
+          Copy-Item target/release/Marquee.exe "$dir/Marquee.exe"
+          Copy-Item LICENSE, README.md "$dir/"
+          # A file named "portable" beside the exe is what switches Marquee to portable mode.
+          Set-Content "$dir/portable" "Marquee keeps its data in the data folder next to this file. Delete this file to keep data in your user profile instead."
+          Compress-Archive -Path "$dir/*" -DestinationPath "Marquee_${version}_x64-portable.zip" -Force
+          gh release upload $tag "Marquee_${version}_x64-portable.zip" --clobber
+
+          gh release edit $tag --notes-file release-notes.md
+
+          # The beta channel reads a fixed URL: releases/download/beta-channel/latest.json.
+          # It always points at the newest build of any kind, so beta users also get stable releases.
+          gh release download $tag --pattern latest.json --clobber
+          gh release view beta-channel 2>$null | Out-Null
+          if ($LASTEXITCODE -ne 0) { gh release create beta-channel --prerelease --title "Beta channel" --notes "Not a version. Marquee's Beta update channel reads the latest.json attached here; it is replaced by every release." --target "${{ github.sha }}" }
+          gh release upload beta-channel latest.json --clobber
+          $global:LASTEXITCODE = 0

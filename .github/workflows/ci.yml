@@ -1,0 +1,91 @@
+# Runs on every push and pull request: lint, type-check and test both halves of the app.
+# No job here talks to a real service; API clients are tested against recorded fixtures.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: UI (lint, types, tests)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Formatting
+        run: npm run format:check
+      - name: Types
+        run: npm run typecheck
+      - name: Component tests
+        run: npm test
+      - name: Release build contains no test data
+        run: |
+          npm run build
+          if grep -rl "Signal From Europa" dist; then echo "::error::The fake test engine was bundled into the release build"; exit 1; fi
+      - name: Browser smoke tests
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+
+  engine:
+    name: Engine (clippy, tests)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: swatinem/rust-cache@v2
+      # The app shell embeds the built UI, so it needs a dist folder to compile against.
+      - run: mkdir -p dist && echo '<!doctype html><title>Marquee</title>' > dist/index.html
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --workspace
+
+  windows:
+    name: Windows (build and test)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: swatinem/rust-cache@v2
+      - run: npm ci
+      - run: npm run build
+      # The Credential Manager, registry, named-pipe and tray code only exists on Windows.
+      # Warnings here are reported but not fatal: this is the only place the Windows-only code is linted.
+      - name: Clippy (Windows-only code)
+        run: cargo clippy --workspace --all-targets
+      - name: Tests
+        run: cargo test --workspace
