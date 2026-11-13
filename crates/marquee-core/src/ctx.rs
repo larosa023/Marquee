@@ -44,6 +44,8 @@ pub struct Ctx {
     pub default_keys: HashMap<String, String>,
     scratch: Mutex<HashMap<String, (String, i64)>>,
     busy: Mutex<Option<String>>,
+    /// Image-cache rows waiting for the database (see `images::record`).
+    pub image_rows: Mutex<Vec<(String, i64, String)>>,
 }
 
 /// name, what it unlocks, where to get it.
@@ -64,7 +66,7 @@ pub const API_KEYS: &[(&str, &str, &str)] = &[
 
 impl Ctx {
     pub fn new(db: Db, http: Http, secrets: Arc<dyn SecretStore>, host: Arc<dyn Host>, data_dir: PathBuf, version: &str, default_keys: HashMap<String, String>) -> Self {
-        Ctx { db, http, secrets, host, data_dir, version: version.to_string(), default_keys, scratch: Mutex::new(HashMap::new()), busy: Mutex::new(None) }
+        Ctx { db, http, secrets, host, data_dir, version: version.to_string(), default_keys, scratch: Mutex::new(HashMap::new()), busy: Mutex::new(None), image_rows: Mutex::new(Vec::new()) }
     }
 
     pub fn key(&self, name: &str) -> Option<String> {

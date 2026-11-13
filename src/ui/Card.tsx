@@ -83,7 +83,7 @@ export function Art({ card, className, eager, large }: { card: Pick<CardData, 't
           src={src}
           alt=""
           crossOrigin="anonymous"
-          className={cx('relative aspect-square w-full object-cover shadow-lg transition-opacity duration-300', loaded ? 'opacity-100' : 'opacity-0')}
+          className={cx('relative aspect-square w-full object-cover shadow-lg transition-opacity duration-150', loaded ? 'opacity-100' : 'opacity-0')}
           loading={eager ? 'eager' : 'lazy'}
           fetchPriority={eager ? 'high' : 'auto'}
           decoding="async"
@@ -101,7 +101,7 @@ export function Art({ card, className, eager, large }: { card: Pick<CardData, 't
         src={src}
         alt=""
         crossOrigin="anonymous"
-        className={cx('h-full w-full object-cover transition-opacity duration-300', loaded ? 'opacity-100' : 'opacity-0')}
+        className={cx('h-full w-full object-cover transition-opacity duration-150', loaded ? 'opacity-100' : 'opacity-0')}
         loading={eager ? 'eager' : 'lazy'}
         fetchPriority={eager ? 'high' : 'auto'}
         decoding="async"

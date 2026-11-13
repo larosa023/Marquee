@@ -2,6 +2,15 @@
 
 All notable changes to Marquee are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.1.4
+
+### Posters load much faster
+- Marquee now downloads artwork ahead of time during each sync: your top 240 picks, this month's releases and the Home hero backdrops are already saved on your PC before you open a page, so they show instantly.
+- Posters appear while a sync is still running: titles are filled in in batches of 48, and each batch shows up on screen within a couple of seconds instead of at the end.
+- A new image no longer waits for the database while a sync is writing; its cache entry is recorded as soon as the database is free.
+- Artwork downloads run up to 150 a second (was 40), and the cache size check runs every 64 images instead of on every one.
+- A shorter fade-in (150 ms).
+
 ## 0.1.3
 
 ### Faster, smoother artwork

@@ -103,6 +103,7 @@ function useBoot() {
   useEffect(() => {
     load();
     const app = useApp.getState;
+    let itemsTimer: ReturnType<typeof setTimeout> | undefined;
     const offs = [
       on('sync:progress', (p) => app().set({ sync: { running: p.pct < 1, label: p.label, pct: p.pct } })),
       on('sync:done', (p) => {
@@ -111,6 +112,14 @@ function useBoot() {
         void app().refreshBoot();
         refreshFeeds(qc);
         void qc.invalidateQueries({ queryKey: ['sources'] });
+      }),
+      on('items:updated', () => {
+        // Posters arrive in batches during a sync: refresh at most every 2 s so they fill in as they're found.
+        if (itemsTimer) return;
+        itemsTimer = setTimeout(() => {
+          itemsTimer = undefined;
+          refreshFeeds(qc);
+        }, 2000);
       }),
       on('taste:updated', () => {
         refreshFeeds(qc);
@@ -137,7 +146,10 @@ function useBoot() {
         app().navigate(file.endsWith('.marqueetheme') ? '/settings/appearance' : '/settings/backup');
       }),
     ];
-    return () => offs.forEach((off) => off());
+    return () => {
+      clearTimeout(itemsTimer);
+      offs.forEach((off) => off());
+    };
   }, [load, qc]);
   return { error, retry: load };
 }

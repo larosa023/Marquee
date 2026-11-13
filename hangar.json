@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "marquee",
   "name": "Marquee",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "New movies, shows, games and albums, picked for your taste.",
   "category": "media",
   "repo": "larosa023/Marquee",

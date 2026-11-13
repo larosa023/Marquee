@@ -11,6 +11,32 @@ use crate::store;
 use rusqlite::params;
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static SINCE_EVICT: AtomicUsize = AtomicUsize::new(0);
+
+/// The poster size the grids show (see `sized` in `src/ui/Card.tsx`): sharp at 2x, a third of w500.
+pub fn card_url(url: &str) -> String {
+    url.replace("image.tmdb.org/t/p/w500/", "image.tmdb.org/t/p/w342/").replace("image.tmdb.org/t/p/original/", "image.tmdb.org/t/p/w342/")
+}
+
+/// Downloads artwork ahead of time so it's on disk before the card scrolls into view.
+pub async fn warm(ctx: &Ctx, urls: Vec<String>) -> usize {
+    use futures::StreamExt;
+    let todo: Vec<String> = urls.into_iter().filter(|u| allowed(u) && !path(ctx, &key(u)).exists()).collect();
+    futures::stream::iter(todo).map(|u| async move { get(ctx, &u).await.is_ok() }).buffer_unordered(16).filter(|ok| futures::future::ready(*ok)).count().await
+}
+
+/// Records new cache rows, now if the database is free, otherwise with the next image.
+fn record(ctx: &Ctx, row: Option<(String, i64, String)>) {
+    let mut pending = ctx.image_rows.lock().unwrap_or_else(|e| e.into_inner());
+    pending.extend(row);
+    let Some(conn) = ctx.db.try_lock() else { return };
+    let stamp = now();
+    for (k, bytes, mime) in pending.drain(..) {
+        let _ = conn.execute("INSERT OR REPLACE INTO image_cache (key, bytes, mime, last_access) VALUES (?1, ?2, ?3, ?4)", params![k, bytes, mime, stamp]);
+    }
+}
 
 pub const DEFAULT_CAP_MB: u64 = 1024;
 
@@ -74,13 +100,30 @@ pub async fn get(ctx: &Ctx, url: &str) -> Result<(Vec<u8>, String)> {
         tokio::fs::create_dir_all(dir).await?;
     }
     tokio::fs::write(&file, &resp.body).await?;
-    ctx.db.lock().execute("INSERT OR REPLACE INTO image_cache (key, bytes, mime, last_access) VALUES (?1, ?2, ?3, ?4)", params![k, resp.body.len() as i64, mime, now()])?;
-    evict(ctx, cap_bytes(ctx))?;
+    record(ctx, Some((k, resp.body.len() as i64, mime.clone())));
+    // Totting up the cache is a table scan: do it every so often, not on every image.
+    if SINCE_EVICT.fetch_add(1, Ordering::Relaxed) % 64 == 63 {
+        evict(ctx, cap_bytes(ctx))?;
+    }
     Ok((resp.body, mime))
 }
 
 pub fn size(ctx: &Ctx) -> (u64, u64) {
+    flush(ctx);
     ctx.db.lock().query_row("SELECT COALESCE(sum(bytes), 0), count(*) FROM image_cache", [], |r| Ok((r.get::<_, i64>(0)? as u64, r.get::<_, i64>(1)? as u64))).unwrap_or((0, 0))
+}
+
+/// Writes any cache rows still waiting for the database.
+pub fn flush(ctx: &Ctx) {
+    let rows: Vec<_> = ctx.image_rows.lock().unwrap_or_else(|e| e.into_inner()).drain(..).collect();
+    if rows.is_empty() {
+        return;
+    }
+    let conn = ctx.db.lock();
+    let stamp = now();
+    for (k, bytes, mime) in rows {
+        let _ = conn.execute("INSERT OR REPLACE INTO image_cache (key, bytes, mime, last_access) VALUES (?1, ?2, ?3, ?4)", params![k, bytes, mime, stamp]);
+    }
 }
 
 /// Deletes least-recently-used images until the cache is under 90% of `cap`.

@@ -315,6 +315,35 @@ pub async fn mark_done(ctx: &Ctx, item_id: i64, done: bool) -> Result<Value> {
 
 // --------------------------------------------------------------- enrichment
 
+/// The card-size poster URLs of these items, for pre-loading.
+fn posters(ctx: &Ctx, ids: &[i64]) -> Vec<String> {
+    let conn = ctx.db.lock();
+    ids.iter().filter_map(|id| conn.query_row("SELECT poster FROM items WHERE id = ?1 AND poster IS NOT NULL", [id], |r| r.get::<_, String>(0)).ok()).map(|u| crate::images::card_url(&u)).collect()
+}
+
+/// Pre-loads the art for the best-scored picks and this month's releases, so the first screens
+/// a person opens show posters instantly.
+async fn warm_top(ctx: &Ctx) {
+    let ids: Vec<i64> = {
+        let conn = ctx.db.lock();
+        let Ok(mut stmt) = conn.prepare(
+            "SELECT id FROM (SELECT i.id FROM items i JOIN scores s ON s.item_id = i.id WHERE i.poster IS NOT NULL ORDER BY s.score DESC LIMIT 240)
+             UNION SELECT id FROM (SELECT id FROM items WHERE poster IS NOT NULL AND release_date BETWEEN ?1 AND ?2 ORDER BY popularity DESC LIMIT 160)",
+        ) else {
+            return;
+        };
+        stmt.query_map([days_from_today(-14), days_from_today(45)], |r| r.get(0)).map(|rows| rows.filter_map(|r| r.ok()).collect()).unwrap_or_default()
+    };
+    let mut urls = posters(ctx, &ids);
+    {
+        // Home's hero uses the backdrops of the top few.
+        let conn = ctx.db.lock();
+        urls.extend(ids.iter().take(12).filter_map(|id| conn.query_row("SELECT backdrop FROM items WHERE id = ?1 AND backdrop IS NOT NULL", [id], |r| r.get::<_, String>(0)).ok()));
+    }
+    let n = crate::images::warm(ctx, urls).await;
+    tracing::debug!("pre-loaded {n} posters");
+}
+
 /// Gives stub items (titles that arrived from a service with only a name and an id) the genres,
 /// tags and creators the taste engine needs. Bounded per run; the rest are picked up next time.
 pub async fn enrich(ctx: &Ctx, budget: usize) -> Result<usize> {
@@ -366,35 +395,49 @@ pub async fn enrich(ctx: &Ctx, budget: usize) -> Result<usize> {
         todo.push((*id, media.clone()));
     }
     use futures::StreamExt;
-    let results: Vec<(i64, Result<()>)> = futures::stream::iter(todo)
-        .map(|(id, media)| async move {
-            let still_stub: bool = ctx.db.lock().query_row("SELECT NOT EXISTS (SELECT 1 FROM item_features f WHERE f.item_id = ?1 AND (f.feature LIKE 'g:%' OR f.feature LIKE 't:%'))", [id], |r| r.get(0)).unwrap_or(true);
-            if !still_stub {
-                return (id, Ok(()));
-            }
-            let result = match media.as_str() {
-                "album" => light_album(ctx, id).await,
-                _ => catalog::ensure_detail(ctx, id).await,
-            };
-            (id, result)
-        })
-        .buffer_unordered(8)
-        .collect()
-        .await;
     let mut offline = None;
-    for (id, result) in results {
-        match result {
-            Ok(()) => done += 1,
-            Err(e) if e.is_offline() => {
-                offline = Some(e);
-                continue;
+    // In batches, so posters appear on screen as they're found rather than when the sync ends.
+    for batch in todo.chunks(48) {
+        let results: Vec<(i64, Result<()>)> = futures::stream::iter(batch.to_vec())
+            .map(|(id, media)| async move {
+                let still_stub: bool = ctx.db.lock().query_row("SELECT NOT EXISTS (SELECT 1 FROM item_features f WHERE f.item_id = ?1 AND (f.feature LIKE 'g:%' OR f.feature LIKE 't:%'))", [id], |r| r.get(0)).unwrap_or(true);
+                if !still_stub {
+                    return (id, Ok(()));
+                }
+                let result = match media.as_str() {
+                    "album" => light_album(ctx, id).await,
+                    _ => catalog::ensure_detail(ctx, id).await,
+                };
+                (id, result)
+            })
+            .buffer_unordered(8)
+            .collect()
+            .await;
+        let mut found = vec![];
+        for (id, result) in results {
+            match result {
+                Ok(()) => {
+                    done += 1;
+                    found.push(id);
+                }
+                Err(e) if e.is_offline() => {
+                    offline = Some(e);
+                    continue;
+                }
+                // A missing key isn't a miss: leave the item to be tried as soon as the key is added.
+                Err(Error::NotConfigured(_)) => continue,
+                Err(e) => tracing::debug!("couldn't enrich item {id}: {e}"),
             }
-            // A missing key isn't a miss: leave the item to be tried as soon as the key is added.
-            Err(Error::NotConfigured(_)) => continue,
-            Err(e) => tracing::debug!("couldn't enrich item {id}: {e}"),
+            // Remember the attempt so an unmatchable title isn't retried on every sync.
+            ctx.db.lock().execute("UPDATE items SET data = json_set(data, '$.enrich_tried', ?1) WHERE id = ?2", rusqlite::params![now(), id])?;
         }
-        // Remember the attempt so an unmatchable title isn't retried on every sync.
-        ctx.db.lock().execute("UPDATE items SET data = json_set(data, '$.enrich_tried', ?1) WHERE id = ?2", rusqlite::params![now(), id])?;
+        if offline.is_some() {
+            break;
+        }
+        if !found.is_empty() {
+            crate::images::warm(ctx, posters(ctx, &found)).await;
+            ctx.emit("items:updated", json!({ "count": found.len() }));
+        }
     }
     if let Some(e) = offline {
         return Err(e);
@@ -569,6 +612,7 @@ pub async fn run(ctx: &Ctx, only: Option<&str>) -> Result<SyncReport> {
         if fetched > 0 {
             report.scored = rescore(ctx)?;
         }
+        warm_top(ctx).await;
         if let Ok(n) = crate::ai::embed_missing(ctx, 300).await {
             if n > 0 {
                 report.scored = rescore(ctx)?;

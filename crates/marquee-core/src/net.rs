@@ -111,10 +111,10 @@ fn limit_for(host: &str) -> (f64, f64) {
         "store.steampowered.com" => (0.6, 3.0), // ~200 per 5 min
         "letterboxd.com" => (0.5, 2.0),
         // Artwork CDNs: a screen of posters loads at once.
-        "image.tmdb.org" | "images.igdb.com" | "i.scdn.co" | "lastfm.freetls.fastly.net" | "i.ytimg.com" | "cdn.myanimelist.net" => (40.0, 60.0),
+        "image.tmdb.org" | "images.igdb.com" | "i.scdn.co" | "lastfm.freetls.fastly.net" | "i.ytimg.com" | "cdn.myanimelist.net" => (150.0, 200.0), // CDNs: no published limit
         "api.myanimelist.net" => (2.0, 4.0),
         "datasets.imdbws.com" => (2.0, 2.0),
-        h if h.ends_with("steamstatic.com") => (40.0, 60.0),
+        h if h.ends_with("steamstatic.com") => (150.0, 200.0),
         "archive.org" => (6.0, 12.0),
         "localhost" | "127.0.0.1" => (50.0, 50.0), // Ollama
         _ => (4.0, 6.0),
