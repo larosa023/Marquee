@@ -118,6 +118,8 @@ pub fn built_in_keys() -> std::collections::HashMap<String, String> {
         ("trakt_client_secret", env!("MARQUEE_TRAKT_CLIENT_SECRET")),
         ("steam", env!("MARQUEE_STEAM_API_KEY")),
         ("itad", env!("MARQUEE_ITAD_API_KEY")),
+        ("mal_client_id", env!("MARQUEE_MAL_CLIENT_ID")),
+        ("mal_client_secret", env!("MARQUEE_MAL_CLIENT_SECRET")),
     ]
     .into_iter()
     .filter(|(_, v)| !v.is_empty())

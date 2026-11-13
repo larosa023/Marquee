@@ -2,6 +2,7 @@
 //! glue here that keeps the local catalog fresh and fills in details on demand.
 
 pub mod igdb;
+pub mod imdb;
 pub mod lastfm;
 pub mod musicbrainz;
 pub mod steam_store;
@@ -118,6 +119,11 @@ pub async fn ensure_detail(ctx: &Ctx, item_id: i64) -> Result<()> {
 
 async fn movie_or_show(ctx: &Ctx, item: &Item) -> Result<Option<ItemDraft>> {
     if !ctx.has_key("tmdb") {
+        return Ok(None);
+    }
+    // A MyAnimeList sequel season ("... Season 2") is news as itself. Matching it to its show on
+    // TMDB would swap in the show's title and first-air date, so it keeps MAL's details.
+    if item.data["mal_sequel"] == true && item.ext("tmdb").is_none() {
         return Ok(None);
     }
     let tmdb_id = match item.ext("tmdb") {
@@ -357,6 +363,14 @@ pub async fn refresh(ctx: &Ctx, progress: &(dyn Fn(&str, f64) + Send + Sync)) ->
         }
     } else {
         report.skipped.push("Movies and TV need a TMDB key (Settings → Connections → API keys).".into());
+    }
+
+    if ctx.has_key("mal_client_id") {
+        progress("Checking this season's anime", 0.3);
+        match crate::integrations::mal::current_and_next(ctx).await {
+            Ok(list) => report.shows += save_all(ctx, &list).map(|v| v.len()).unwrap_or(0),
+            Err(e) => offline |= note(&mut report, "Anime", e),
+        }
     }
 
     progress("Checking new games", 0.35);

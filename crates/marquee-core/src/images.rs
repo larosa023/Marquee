@@ -14,7 +14,8 @@ use std::path::PathBuf;
 
 pub const DEFAULT_CAP_MB: u64 = 1024;
 
-const HOSTS: &[&str] = &["image.tmdb.org", "images.igdb.com", "coverartarchive.org", "archive.org", "steamstatic.com", "steampowered.com", "akamaihd.net", "scdn.co", "spotifycdn.com", "fastly.net", "last.fm", "ytimg.com", "ltrbxd.com"];
+const HOSTS: &[&str] =
+    &["image.tmdb.org", "images.igdb.com", "coverartarchive.org", "archive.org", "steamstatic.com", "steampowered.com", "akamaihd.net", "scdn.co", "spotifycdn.com", "fastly.net", "last.fm", "ytimg.com", "ltrbxd.com", "cdn.myanimelist.net"];
 
 pub fn allowed(url: &str) -> bool {
     let Ok(u) = url::Url::parse(url) else { return false };
@@ -136,6 +137,7 @@ mod tests {
         assert!(allowed("https://image.tmdb.org/t/p/w500/x.jpg"));
         assert!(allowed("https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1/header.jpg"));
         assert!(allowed("https://i.scdn.co/image/abc"));
+        assert!(allowed("https://cdn.myanimelist.net/images/anime/10/47347l.jpg"));
         assert!(!allowed("http://image.tmdb.org/t/p/w500/x.jpg"), "no plain http");
         assert!(!allowed("https://evil.example/x.jpg"));
         assert!(!allowed("https://image.tmdb.org.evil.example/x.jpg"));

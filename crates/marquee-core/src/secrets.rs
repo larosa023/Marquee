@@ -18,6 +18,8 @@ pub const SECRET_KEYS: &[&str] = &[
     "spotify.access",
     "spotify.refresh",
     "lastfm.session",
+    "mal.access",
+    "mal.refresh",
     "key.tmdb",
     "key.igdb_client_id",
     "key.igdb_client_secret",
@@ -28,6 +30,8 @@ pub const SECRET_KEYS: &[&str] = &[
     "key.lastfm_secret",
     "key.steam",
     "key.itad",
+    "key.mal_client_id",
+    "key.mal_client_secret",
 ];
 
 /// In-memory store for tests and for running the engine outside the app.

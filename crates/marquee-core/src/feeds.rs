@@ -529,6 +529,10 @@ pub async fn detail(ctx: &Ctx, item_id: i64) -> Result<Value> {
                 targets.push(json!({ "id": "letterboxd:watchlist", "label": "Letterboxd watchlist", "hint": "Opens the film's page", "ready": true }));
             }
             targets.push(json!({ "id": "trakt:watchlist", "label": "Trakt watchlist", "ready": has("trakt") }));
+            if crate::integrations::mal::is_anime(&item) {
+                let ready = crate::integrations::mal::can_write(ctx);
+                targets.push(json!({ "id": "mal:list", "label": "MyAnimeList: Plan to Watch", "hint": if ready { Value::Null } else { json!("Sign in to MyAnimeList in Settings first") }, "ready": ready }));
+            }
         }
         Media::Game => {
             if item.ext("steam").is_some() {
@@ -540,7 +544,8 @@ pub async fn detail(ctx: &Ctx, item_id: i64) -> Result<Value> {
             targets.push(json!({ "id": "spotify:playlist:picks", "label": "Marquee Picks playlist", "ready": has("spotify") }));
         }
     }
-    let seriesgraph = if item.media == Media::Tv { item.ext("tmdb").map(|id| format!("https://seriesgraph.com/show/{id}")) } else { None };
+    // SeriesGraph's show pages are keyed by TMDB id: seriesgraph.com/show/1396-breaking-bad
+    let seriesgraph = if item.media == Media::Tv { item.ext("tmdb").map(|id| format!("https://seriesgraph.com/show/{id}-{}", slug(&item.title))) } else { None };
     Ok(json!({
         "item": item,
         "card": card,
@@ -555,6 +560,7 @@ pub async fn detail(ctx: &Ctx, item_id: i64) -> Result<Value> {
         "targets": targets,
         "seriesgraph": seriesgraph,
         "letterboxd": if item.media == Media::Movie { crate::integrations::letterboxd::film_url(&item) } else { None },
+        "mal": item.ext("mal").map(crate::integrations::mal::anime_url),
         "offline": offline,
         "note": note,
     }))
@@ -563,12 +569,56 @@ pub async fn detail(ctx: &Ctx, item_id: i64) -> Result<Value> {
 /// Episode ratings for the heatmap, season by season.
 pub async fn episodes(ctx: &Ctx, item_id: i64) -> Result<Value> {
     let item = store::get_item(&ctx.db.lock(), item_id)?;
-    let Some(tmdb) = item.ext("tmdb").filter(|_| item.media == Media::Tv) else { return Ok(json!({ "seasons": [] })) };
+    if item.media != Media::Tv {
+        return Ok(json!({ "seasons": [] }));
+    }
+    // TMDB supplies episode names and air dates; IMDb (when its ratings are downloaded) supplies
+    // the ratings, the same ones SeriesGraph charts.
     let numbers: Vec<i64> = item.data["seasons"].as_array().map(|a| a.iter().filter_map(|s| s["number"].as_i64()).collect()).unwrap_or_default();
-    let seasons = catalog::tmdb::episode_ratings(ctx, tmdb, &numbers).await?;
+    let tmdb_seasons = match item.ext("tmdb") {
+        Some(tmdb) if ctx.has_key("tmdb") => match catalog::tmdb::episode_ratings(ctx, tmdb, &numbers).await {
+            Ok(s) => s,
+            Err(e) if item.ext("imdb").is_none() => return Err(e),
+            Err(_) => vec![],
+        },
+        _ => vec![],
+    };
+    let imdb = if catalog::imdb::enabled(ctx) { item.ext("imdb").and_then(|id| catalog::imdb::show(&ctx.data_dir, id)) } else { None };
+    let (seasons, source, show_rating) = match imdb {
+        Some((eps, show_rating)) if !eps.is_empty() => (merge_imdb(&tmdb_seasons, &eps), "IMDb", show_rating),
+        other => (tmdb_seasons, "TMDB", other.and_then(|o| o.1)),
+    };
     let rated: Vec<f64> = seasons.iter().flatten().filter_map(|e| e.rating).collect();
     let avg = if rated.is_empty() { None } else { Some((rated.iter().sum::<f64>() / rated.len() as f64 * 10.0).round() / 10.0) };
-    Ok(json!({ "seasons": seasons, "average": avg, "source": "TMDB" }))
+    Ok(json!({
+        "seasons": seasons,
+        "average": avg,
+        "source": source,
+        "imdb": show_rating.map(|(rating, votes)| json!({ "rating": rating, "votes": votes, "url": item.ext("imdb").map(|id| format!("https://www.imdb.com/title/{id}/")) })),
+        "attribution": if source == "IMDb" { Some(catalog::imdb::ATTRIBUTION) } else { None },
+    }))
+}
+
+/// IMDb ratings laid over TMDB's episode list. Episodes only IMDb knows get a plain name;
+/// episodes only TMDB knows (not aired, or not rated yet) stay, unrated.
+fn merge_imdb(tmdb: &[Vec<catalog::tmdb::Episode>], imdb: &[catalog::imdb::ImdbEpisode]) -> Vec<Vec<catalog::tmdb::Episode>> {
+    let mut by_season: std::collections::BTreeMap<i64, std::collections::BTreeMap<i64, catalog::tmdb::Episode>> = Default::default();
+    for e in tmdb.iter().flatten().filter(|e| e.season > 0) {
+        by_season.entry(e.season).or_default().insert(e.number, catalog::tmdb::Episode { rating: None, votes: 0, ..e.clone() });
+    }
+    for e in imdb.iter().filter(|e| e.season > 0 && e.number > 0) {
+        let slot = by_season.entry(e.season).or_default().entry(e.number).or_insert_with(|| catalog::tmdb::Episode { season: e.season, number: e.number, name: format!("Episode {}", e.number), air_date: None, rating: None, votes: 0 });
+        slot.rating = Some(e.rating);
+        slot.votes = e.votes;
+    }
+    by_season
+        .into_iter()
+        .map(|(season, eps)| {
+            // Fill gaps so the grid stays aligned (a missing E3 shows as an empty cell, not a shift).
+            let last = eps.keys().max().copied().unwrap_or(0);
+            (1..=last).map(|n| eps.get(&n).cloned().unwrap_or(catalog::tmdb::Episode { season, number: n, name: format!("Episode {n}"), air_date: None, rating: None, votes: 0 })).collect::<Vec<_>>()
+        })
+        .collect()
 }
 
 // --------------------------------------------------------------- Taste screen
@@ -996,5 +1046,34 @@ mod tests {
         assert_eq!(o["stats"]["counts"]["rated"], 1);
         assert!(o["stats"]["streak_weeks"].as_i64().unwrap() >= 1);
         assert!(o["vocabulary"].as_array().unwrap().len() > 50);
+    }
+
+    #[tokio::test]
+    async fn the_heatmap_uses_imdb_ratings_with_tmdb_names() {
+        use crate::catalog::imdb::{self, testing::*};
+        let t = ctx();
+        let show = add(&t, Media::Tv, "Breaking Bad", -6000, &["Drama"], &[], 10.0, |d| {
+            d.ids = vec![("tmdb".into(), "1396".into()), ("imdb".into(), "tt0903747".into())];
+            d.set("seasons", json!([{ "number": 1 }]));
+        });
+        t.net.on("/tv/1396/season/1", 200, include_str!("../tests/fixtures/tmdb_season.json"));
+        // Without IMDb's files: TMDB's own ratings.
+        let v = episodes(&t.ctx, show).await.unwrap();
+        assert_eq!(v["source"], "TMDB");
+
+        imdb::build(&imdb::db_path(&t.ctx.data_dir), &imdb::parse_ratings(&gz(RATINGS)), &gz(EPISODES)).unwrap();
+        let v = episodes(&t.ctx, show).await.unwrap();
+        assert_eq!(v["source"], "IMDb");
+        assert_eq!(v["imdb"]["rating"], 9.5);
+        assert!(v["attribution"].as_str().unwrap().contains("courtesy of IMDb"));
+        let seasons = v["seasons"].as_array().unwrap();
+        assert_eq!(seasons[0][0]["rating"], 9.0, "IMDb's number, not TMDB's");
+        assert_ne!(seasons[0][0]["name"], "Episode 1", "TMDB's episode name is kept");
+        // Season 5 only exists in IMDb's data; its grid is padded up to episode 14.
+        let s5 = seasons.iter().find(|s| s[0]["season"] == 5).unwrap().as_array().unwrap();
+        assert_eq!(s5.len(), 14);
+        assert_eq!(s5[13]["rating"], 10.0);
+        assert!(s5[0]["rating"].is_null());
+        assert_eq!(s5[0]["season"], 5);
     }
 }

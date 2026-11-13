@@ -110,6 +110,7 @@ fn source_for_target(target: &str) -> Option<(&'static str, String)> {
         "letterboxd" => "letterboxd",
         "spotify" => "spotify",
         "lastfm" => "lastfm",
+        "mal" => "mal",
         _ => return None,
     };
     Some((id, rest.to_string()))
@@ -281,6 +282,9 @@ pub async fn rate(ctx: &Ctx, item_id: i64, stars: f64) -> Result<Value> {
     if matches!(item.media, Media::Movie | Media::Tv) && connected("trakt") {
         pushed.push(json!({ "source": "trakt", "result": push(ctx, "trakt", &WriteOp::Rate { item_id, stars }).await }));
     }
+    if crate::integrations::mal::is_anime(&item) && crate::integrations::mal::can_write(ctx) {
+        pushed.push(json!({ "source": "mal", "result": push(ctx, "mal", &WriteOp::Rate { item_id, stars }).await }));
+    }
     if item.media == Media::Album && stars >= 4.0 && ctx.secrets.get("lastfm.session").is_some() {
         pushed.push(json!({ "source": "lastfm", "result": push(ctx, "lastfm", &WriteOp::Rate { item_id, stars }).await }));
     }
@@ -302,6 +306,9 @@ pub async fn mark_done(ctx: &Ctx, item_id: i64, done: bool) -> Result<Value> {
     let mut pushed = vec![];
     if done && matches!(item.media, Media::Movie | Media::Tv) && store::is_connected(&ctx.db.lock(), "trakt") {
         pushed.push(json!({ "source": "trakt", "result": push(ctx, "trakt", &WriteOp::MarkDone { item_id, at: now() }).await }));
+    }
+    if done && crate::integrations::mal::is_anime(&item) && crate::integrations::mal::can_write(ctx) {
+        pushed.push(json!({ "source": "mal", "result": push(ctx, "mal", &WriteOp::MarkDone { item_id, at: now() }).await }));
     }
     Ok(json!({ "done": done, "pushed": pushed }))
 }
@@ -543,6 +550,13 @@ pub async fn run(ctx: &Ctx, only: Option<&str>) -> Result<SyncReport> {
         if let Ok(n) = crate::ai::embed_missing(ctx, 300).await {
             if n > 0 {
                 report.scored = rescore(ctx)?;
+            }
+        }
+        // IMDb's episode ratings (the data SeriesGraph charts), about once a week.
+        if catalog::imdb::is_due(ctx) {
+            progress(ctx, "Updating IMDb episode ratings", 0.92);
+            if let Err(e) = catalog::imdb::refresh(ctx).await {
+                tracing::warn!("IMDb episode ratings weren't updated: {e}");
             }
         }
     }

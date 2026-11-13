@@ -101,6 +101,7 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
     ['spotify', 'Spotify'],
     ['lastfm', 'Last.fm'],
     ['letterboxd', 'Letterboxd'],
+    ['mal', 'MyAnimeList'],
     ['serializd', 'Serializd'],
     ['import', 'File import'],
   ].map(([id, name]) => ({ id, name, status: 'disconnected', account: null, last_sync: null, error: null, config: {}, configured: true, reads: ['History'], writes: id === 'trakt' ? ['Watchlist'] : [], note: `${name} test connection.` }));
@@ -122,7 +123,7 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
       version: '0.1.0',
       settings: { ...settings },
       sources: sources.map((s) => ({ ...s })),
-      keys: ['tmdb', 'igdb_client_id', 'igdb_client_secret', 'lastfm_key', 'lastfm_secret', 'spotify_client_id', 'trakt_client_id', 'trakt_client_secret', 'steam', 'itad'].map((name) => ({
+      keys: ['tmdb', 'igdb_client_id', 'igdb_client_secret', 'lastfm_key', 'lastfm_secret', 'spotify_client_id', 'trakt_client_id', 'trakt_client_secret', 'steam', 'itad', 'mal_client_id', 'mal_client_secret'].map((name) => ({
         name,
         what: `Test key for ${name}`,
         url: 'https://example.test',
@@ -227,6 +228,7 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
           targets,
           seriesgraph: card.media === 'tv' ? 'https://seriesgraph.com/show/900' : null,
           letterboxd: card.media === 'movie' ? 'https://letterboxd.com/tmdb/900' : null,
+          mal: null,
           offline: false,
           note: null,
         };
@@ -240,7 +242,9 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
             ],
           ],
           average: 7.3,
-          source: 'TMDB',
+          source: 'IMDb',
+          imdb: { rating: 8.4, votes: 52000, url: 'https://www.imdb.com/title/tt0000001/' },
+          attribution: 'Information courtesy of IMDb (https://www.imdb.com). Used with permission.',
         };
       case 'item.blurb':
         return { blurb: null };
@@ -389,7 +393,8 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
       case 'connect.letterboxd':
       case 'connect.steam_id':
       case 'connect.steam':
-      case 'connect.spotify': {
+      case 'connect.spotify':
+      case 'connect.mal': {
         const id = method.split('.')[1];
         const s = sources.find((x) => x.id === id)!;
         s.status = 'connected';
@@ -406,6 +411,15 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
         return { token: 'tok' };
       case 'connect.lastfm.auth_finish':
         return { account: 'tester' };
+      case 'connect.mal.signin': {
+        const s = sources.find((x) => x.id === 'mal')!;
+        Object.assign(s, { status: 'connected', account: 'tester', config: { username: 'tester', can_write: true } });
+        return { account: 'tester' };
+      }
+      case 'imdb.refresh':
+        return { episodes: 812345, storage: await call('storage', {}) };
+      case 'imdb.remove':
+        return call('storage', {});
       case 'disconnect': {
         const s = sources.find((x) => x.id === p.source)!;
         Object.assign(s, { status: 'disconnected', account: null, last_sync: null, config: {} });
@@ -457,9 +471,9 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
       case 'ai.status':
         return { enabled: true, running: false, endpoint: 'http://localhost:11434', models: [], chat_model: null, embed_model: null, error: null };
       case 'storage':
-        return { images_bytes: 52_000_000, images: 310, image_cap_bytes: 1_073_741_824, database_bytes: 4_200_000, cached_responses: 88, backups_bytes: 0, data_dir: 'C:\\Users\\test\\AppData\\Roaming\\Marquee' };
+        return { images_bytes: 52_000_000, images: 310, image_cap_bytes: 1_073_741_824, database_bytes: 4_200_000, cached_responses: 88, backups_bytes: 0, imdb_bytes: 0, imdb_updated_at: null, data_dir: 'C:\\Users\\test\\AppData\\Roaming\\Marquee' };
       case 'cache.clear':
-        return { images_bytes: 0, images: 0, image_cap_bytes: 1_073_741_824, database_bytes: 4_200_000, cached_responses: 0, backups_bytes: 0, data_dir: 'C:\\Users\\test\\AppData\\Roaming\\Marquee' };
+        return { images_bytes: 0, images: 0, image_cap_bytes: 1_073_741_824, database_bytes: 4_200_000, cached_responses: 0, backups_bytes: 0, imdb_bytes: 0, imdb_updated_at: null, data_dir: 'C:\\Users\\test\\AppData\\Roaming\\Marquee' };
       case 'diagnostics':
         return 'Marquee 0.1.0 (test)\n';
       case 'backup.list':

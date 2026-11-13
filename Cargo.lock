@@ -2365,7 +2365,7 @@ dependencies = [
 
 [[package]]
 name = "marquee"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64 0.22.1",
  "keyring",
@@ -2394,12 +2394,13 @@ dependencies = [
 
 [[package]]
 name = "marquee-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chrono",
  "csv",
+ "flate2",
  "futures",
  "md-5",
  "rand 0.8.8",

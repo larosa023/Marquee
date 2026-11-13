@@ -120,6 +120,7 @@ function General() {
   const [onLaunch, setOnLaunch] = useSetting('sync.on_launch', true);
   const [interval, setIntervalHours] = useSetting<number>('sync.interval_hours', 6);
   const [autoplay, setAutoplay] = useSetting('home.trailer_autoplay', true);
+  const [imdb, setImdb] = useSetting('imdb.enabled', true);
   const [autostart, setAutostart] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -172,6 +173,7 @@ function General() {
         />
       </Field>
       <Toggle checked={autoplay} onChange={setAutoplay} label="Play trailers on hover" description="On Home, the hero plays its trailer, muted, when you hover it." />
+      <Toggle checked={imdb} onChange={setImdb} label="Episode ratings from IMDb" description="The ratings SeriesGraph charts. Marquee downloads IMDb's public rating files (about 60 MB) once a week and keeps the episode ratings on this PC (about 25 MB). Off: episode heatmaps use TMDB's ratings." />
     </Group>
   );
 }
@@ -450,6 +452,8 @@ const ATTRIBUTIONS: { name: string; text: string; url: string }[] = [
   { name: 'Spotify', text: 'Library, playlists and previews are provided by Spotify. Marquee is not affiliated with Spotify AB.', url: 'https://www.spotify.com' },
   { name: 'Trakt', text: 'Watch history, ratings and watchlist sync is provided by Trakt.', url: 'https://trakt.tv' },
   { name: 'IsThereAnyDeal', text: 'Historical low prices are provided by IsThereAnyDeal, when you add a key.', url: 'https://isthereanydeal.com' },
+  { name: 'IMDb', text: "Episode and show ratings: information courtesy of IMDb (https://www.imdb.com). Used with permission. From IMDb's non-commercial datasets, kept on this PC.", url: 'https://developer.imdb.com/non-commercial-datasets/' },
+  { name: 'MyAnimeList', text: 'Anime lists, scores and seasonal anime come from the MyAnimeList API. Marquee is not affiliated with MyAnimeList.', url: 'https://myanimelist.net' },
   { name: 'Letterboxd · SeriesGraph', text: 'Marquee reads your own public Letterboxd RSS feed and data export, and links to SeriesGraph. It is not affiliated with either.', url: 'https://letterboxd.com' },
 ];
 const LICENSES: [string, string][] = [

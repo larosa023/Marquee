@@ -58,6 +58,8 @@ pub const API_KEYS: &[(&str, &str, &str)] = &[
     ("trakt_client_secret", "Trakt sign-in", "https://trakt.tv/oauth/applications"),
     ("steam", "Your Steam library, playtime and wishlist", "https://steamcommunity.com/dev/apikey"),
     ("itad", "Optional: all-time low prices for games", "https://isthereanydeal.com/apps/my/"),
+    ("mal_client_id", "Anime: your MyAnimeList list and each season's new anime", "https://myanimelist.net/apiconfig"),
+    ("mal_client_secret", "Only for a MyAnimeList app of type \"web\" (type \"other\" has none)", "https://myanimelist.net/apiconfig"),
 ];
 
 impl Ctx {

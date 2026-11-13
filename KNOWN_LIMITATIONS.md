@@ -45,8 +45,18 @@ Spotify's February 2026 rules for personal ("development mode") apps shape what 
 
 ### SeriesGraph
 
-- Not an account source. Show pages have a "View episode ratings graph on SeriesGraph" button, and an in-app heatmap built from TMDB's per-episode ratings (IMDb's own ratings aren't available to apps, so numbers differ slightly from SeriesGraph's).
-- The link uses `https://seriesgraph.com/show/<TMDB id>`. **Not verified from a real machine**: if SeriesGraph changes its addresses, the button will land on their home page or a not-found page.
+- **No API, so Marquee uses SeriesGraph's source instead.** SeriesGraph draws its heatmaps from IMDb's episode ratings. IMDb publishes those as downloadable files for personal, non-commercial use, so Marquee downloads `title.ratings` and `title.episode` (about 60 MB) once a week and keeps every rated episode on your PC (about 25 MB, `imdb.db` in the data folder). Show heatmaps then use the same numbers SeriesGraph shows. Turn it off in Settings → General; heatmaps then fall back to TMDB's ratings, which have far fewer votes.
+- The first download happens during a sync, so heatmaps use TMDB until it finishes. Settings → Storage has "Download now".
+- IMDb's files don't include episode titles; Marquee takes those from TMDB. A show TMDB doesn't link to an IMDb id gets TMDB's ratings.
+- Show pages also have a "View episode ratings graph on SeriesGraph" button. Its links use `seriesgraph.com/show/<TMDB id>-<name>`, the format SeriesGraph's own pages use.
+
+### MyAnimeList
+
+- **A username reads a public list; signing in is needed to change it.** MAL's API serves public lists with just the app's client ID. Adding to Plan to Watch, marking completed and scoring need you to sign in on MyAnimeList once (Settings → Connections → MyAnimeList). Signing in also reads a private list.
+- **Seasons are folded into one show.** MAL lists each season (and part, and cour) separately; TMDB, Trakt and Letterboxd treat a show as one title. Marquee folds a franchise's TV entries into one show so it matches everywhere else: its score is the average of the seasons you scored, and it counts as watched if you've watched any season. Movies stay separate. Writes from Marquee (add, complete, score) go to the show's first entry on MAL.
+- Title matching between MAL and TMDB is by English title and year. A few shows with very different English and Japanese names may not match; they still appear, with MAL's artwork and details.
+- New seasons of anime (for example "Season 2") appear as their own releases in the feeds and calendar, with MAL's details, rather than being merged into the show.
+- "Dropped" with no score counts as a mild "not for me". Shows marked Plan to Watch go to your Watchlist.
 
 ### Xbox, PlayStation, GOG, Epic
 
