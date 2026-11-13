@@ -20,6 +20,36 @@ interface HomeData {
   counts: { items: number; events: number };
 }
 
+const SPARKS = [
+  { kind: 'movie', label: 'A movie', icon: 'film' },
+  { kind: 'tv', label: 'A show', icon: 'tv' },
+  { kind: 'game', label: 'A game', icon: 'gamepad' },
+  { kind: 'album', label: 'An album', icon: 'music' },
+  { kind: 'any', label: 'Anything', icon: 'dice' },
+] as const;
+
+/** "Need a spark?": one tap rolls a random pick of each kind. */
+function Spark() {
+  const open = (kind: (typeof SPARKS)[number]['kind']) => useApp.getState().set({ surprise: kind });
+  return (
+    <section aria-labelledby="spark-title" className="mx-(--pad) mb-9 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-card bg-surface px-5 py-4">
+      <div className="mr-auto">
+        <h2 id="spark-title" className="font-semibold">
+          Need a spark?
+        </h2>
+        <p className="text-[13px] text-subtext">Roll a random pick you'd probably like.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {SPARKS.map((s) => (
+          <Button key={s.kind} icon={s.icon} variant={s.kind === 'any' ? 'primary' : 'secondary'} onClick={() => open(s.kind)}>
+            {s.label}
+          </Button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /** A reason with titles in italics. */
 export function Reason({ text, className }: { text: string; className?: string }) {
   return (
@@ -209,6 +239,7 @@ export default function Home() {
           </div>
         </div>
       )}
+      <Spark />
       {data.rows.map((r) => (
         <Row key={r.id} id={r.id} title={r.title} subtitle={r.subtitle} cards={r.cards} onContext={menu.onContext} />
       ))}

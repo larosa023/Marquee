@@ -458,6 +458,55 @@ pub fn quick_rate(ctx: &Ctx, limit: usize) -> Result<Vec<Card>> {
     Ok(out)
 }
 
+/// "Surprise me": one random title for a spark, drawn from the titles the user would probably
+/// like (the top of their picks, widened by the taste dial) rather than from the whole catalog.
+/// `media` = None means any medium; `skip` holds the last few picks so a re-roll is always new.
+pub fn surprise(ctx: &Ctx, media: Option<Media>, upcoming: bool, skip: &[i64]) -> Result<Option<Card>> {
+    let mut sql = vec!["i.media != 'artist'".to_string(), "i.poster IS NOT NULL".into(), NOT_DONE.into()];
+    sql.push("NOT EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind = 'dismiss')".into());
+    let mut args: Vec<Sql> = vec![];
+    if let Some(m) = media {
+        sql.push("i.media = ?".into());
+        args.push(Sql::Text(m.as_str().into()));
+    }
+    if !upcoming {
+        sql.push("i.release_date IS NOT NULL AND i.release_date <= ?".into());
+        args.push(Sql::Text(today()));
+    }
+    if !skip.is_empty() {
+        sql.push(format!("i.id NOT IN ({})", in_list(skip.len())));
+        args.extend(skip.iter().map(|id| Sql::Integer(*id)));
+    }
+    let personal = has_taste(ctx);
+    // Comfort draws from the top 60; Adventurous from the top 400.
+    let pool = (60.0 + 340.0 * taste::TasteSettings::load(&ctx.db).dial) as i64;
+    let order = if personal { "s.score DESC, i.popularity DESC" } else { "i.popularity DESC" };
+    let where_sql = sql.join(" AND ");
+    let conn = ctx.db.lock();
+    let ids: Vec<i64> = {
+        let mut stmt = conn.prepare(&format!("SELECT i.id FROM {CARD_FROM} WHERE {where_sql} ORDER BY {order} LIMIT {pool}"))?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(args.iter()), |r| r.get(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
+    };
+    if ids.is_empty() {
+        return Ok(None);
+    }
+    // Lean toward the better matches without making the top one a sure thing: weight by rank.
+    use rand::Rng;
+    let weights: Vec<f64> = (0..ids.len()).map(|i| 1.0 / (1.0 + i as f64 / 25.0)).collect();
+    let total: f64 = weights.iter().sum();
+    let mut roll = rand::thread_rng().gen_range(0.0..total);
+    let mut pick = ids[ids.len() - 1];
+    for (id, w) in ids.iter().zip(&weights) {
+        if roll < *w {
+            pick = *id;
+            break;
+        }
+        roll -= w;
+    }
+    Ok(cards(&conn, "WHERE i.id = ?1", &[&pick])?.into_iter().next())
+}
+
 /// Today's releases worth knowing about, for the tray panel.
 pub fn today_releases(ctx: &Ctx, limit: i64) -> Result<Vec<Card>> {
     let t = today();
@@ -930,6 +979,23 @@ mod tests {
         assert!(!home["hero"].as_array().unwrap().is_empty());
         let card = home["rows"][0]["cards"][0].clone();
         assert!(card["match_pct"].is_number() && card["title"].is_string() && card["media"].is_string());
+    }
+
+    #[test]
+    fn surprise_picks_something_unseen_of_the_right_kind_and_rerolls_to_something_new() {
+        let (t, ids) = world();
+        for _ in 0..30 {
+            let card = surprise(&t.ctx, Some(Media::Movie), false, &[]).unwrap().unwrap();
+            assert_eq!(card.media, "movie");
+            assert!(card.release_date.as_deref().unwrap() <= today().as_str(), "released only, unless asked");
+            assert_ne!(card.title, "Arrival", "already rated");
+        }
+        let show = surprise(&t.ctx, Some(Media::Tv), true, &[]).unwrap();
+        assert!(show.is_none(), "the only show is one they're watching");
+        let game = surprise(&t.ctx, Some(Media::Game), true, &[]).unwrap().unwrap();
+        assert_eq!(game.id, ids["game"]);
+        assert!(surprise(&t.ctx, Some(Media::Game), true, &[ids["game"]]).unwrap().is_none(), "skips the last pick");
+        assert!(surprise(&t.ctx, None, true, &[]).unwrap().is_some());
     }
 
     #[test]

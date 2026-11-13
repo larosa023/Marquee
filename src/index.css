@@ -75,67 +75,70 @@
   --font-display: var(--display);
 }
 
-* {
-  box-sizing: border-box;
-}
-html,
-body,
-#root {
-  height: 100%;
-  margin: 0;
-}
-html {
-  background: transparent;
-}
-body {
-  font-family: var(--font);
-  font-size: 14px;
-  line-height: 1.45;
-  color: var(--text);
-  background: transparent;
-  overflow: hidden;
-  -webkit-font-smoothing: antialiased;
-  font-feature-settings: 'cv11', 'ss01';
-  user-select: none;
-  cursor: default;
-}
-/* In a browser (tests, dev) there is no Mica behind the window. */
-html[data-shell='browser'] body,
-html[data-backdrop='none'] body {
-  background: var(--bg);
-}
-.selectable,
-input,
-textarea {
-  user-select: text;
-}
-h1,
-h2,
-h3,
-.display {
-  font-family: var(--display);
-  letter-spacing: -0.02em;
-}
-/* Dates, prices, counts and ratings line up in columns. */
-.tnum {
-  font-variant-numeric: tabular-nums;
-}
-button,
-input,
-select,
-textarea {
-  font: inherit;
-  color: inherit;
-}
-button {
-  cursor: default;
-}
-img {
-  display: block;
-  -webkit-user-drag: none;
-}
-a {
-  color: inherit;
+/* In the base layer so utilities (text-on-accent and friends) win over these resets. */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+  html {
+    background: transparent;
+  }
+  body {
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--text);
+    background: transparent;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    user-select: none;
+    cursor: default;
+  }
+  /* In a browser (tests, dev) there is no Mica behind the window. */
+  html[data-shell='browser'] body,
+  html[data-backdrop='none'] body {
+    background: var(--bg);
+  }
+  .selectable,
+  input,
+  textarea {
+    user-select: text;
+  }
+  h1,
+  h2,
+  h3,
+  .display {
+    font-family: var(--display);
+    letter-spacing: -0.02em;
+  }
+  /* Dates, prices, counts and ratings line up in columns. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+  button {
+    cursor: default;
+  }
+  img {
+    display: block;
+    -webkit-user-drag: none;
+  }
+  a {
+    color: inherit;
+  }
 }
 
 /* One visible focus ring everywhere, only for keyboard users. */

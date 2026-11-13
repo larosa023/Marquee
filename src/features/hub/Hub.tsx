@@ -92,7 +92,11 @@ export default function Hub({ media }: { media: Media }) {
   const platforms = q.data?.pages[0]?.platforms ?? [];
   return (
     <>
-      <PageHeader title={copy.title} subtitle={copy.subtitle} />
+      <PageHeader title={copy.title} subtitle={copy.subtitle}>
+        <Button icon="dice" onClick={() => useApp.getState().set({ surprise: media })}>
+          Surprise me
+        </Button>
+      </PageHeader>
       {offline && <OfflineBanner />}
       {!keySet && cards.length > 0 && (
         <div role="status" className="mx-(--pad) mb-4 flex flex-wrap items-center gap-2.5 rounded-control bg-warn/12 px-3.5 py-2 text-[13px] text-warn">

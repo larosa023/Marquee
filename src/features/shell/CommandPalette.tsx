@@ -94,6 +94,15 @@ export function CommandPalette() {
           .then((r) => toast(`Backed up to ${r.path}`, 'good'))
           .catch((e) => toast(e.message, 'bad')),
     });
+    for (const [kind, what] of [
+      ['any', 'anything'],
+      ['movie', 'a movie'],
+      ['tv', 'a show'],
+      ['game', 'a game'],
+      ['album', 'an album'],
+    ] as const) {
+      out.push({ id: `surprise-${kind}`, group: 'Actions', label: `Surprise me: ${what}`, icon: 'dice', keywords: 'random spark roll pick', run: () => useApp.getState().set({ surprise: kind }) });
+    }
     out.push({ id: 'updates', group: 'Actions', label: 'Check for updates', icon: 'download', run: () => navigate('/settings/updates') });
     out.push({ id: 'connect', group: 'Actions', label: 'Connect a service', icon: 'plug', keywords: 'steam spotify trakt letterboxd lastfm', run: () => navigate('/settings/connections') });
     out.push({ id: 'import', group: 'Actions', label: 'Import a file (CSV or JSON)', icon: 'upload', keywords: 'imdb backloggd rateyourmusic', run: () => navigate('/settings/connections') });

@@ -179,6 +179,12 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
         return visible()
           .filter((c) => c.release_date! >= p.from && c.release_date! <= p.to)
           .map((card) => ({ date: card.release_date, kind: 'release', label: card.title, card, pinned: false }));
+      case 'surprise': {
+        const skip: number[] = p.skip ?? [];
+        const today = new Date().toISOString().slice(0, 10);
+        const pool = visible().filter((c) => !c.done && c.poster && (p.media == null || p.media === 'any' || c.media === p.media) && !skip.includes(c.id) && (p.upcoming || (c.release_date ?? '9') <= today));
+        return pool[Math.floor(Math.random() * pool.length)] ?? null;
+      }
       case 'quick_rate':
         return visible()
           .filter((c) => c.user_rating == null)

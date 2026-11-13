@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { create } from 'zustand';
 import { api } from '@/lib/api';
-import type { Bootstrap } from '@/lib/types';
+import type { Bootstrap, Media } from '@/lib/types';
 
 export interface Toast {
   id: number;
@@ -64,6 +64,8 @@ interface AppState {
   update: UpdateInfo | null;
   /** The release-notes dialog (opened from the "Update ready" pill). */
   updateOpen: boolean;
+  /** The "Surprise me" dialog, opened on a kind of title (or 'any'). */
+  surprise: Media | 'any' | null;
   /** A .marqueetheme or .marqueebackup file opened from Explorer, waiting for its screen. */
   pendingFile: string | null;
 
@@ -102,6 +104,7 @@ export const useApp = create<AppState>((set, get) => ({
   unread: 0,
   update: null,
   updateOpen: false,
+  surprise: null,
   pendingFile: null,
 
   setBoot: (boot) => set({ boot, unread: boot.unread, sidebarCollapsed: !!boot.settings['ui.sidebar_collapsed'], offline: !!boot.settings['last_sync']?.offline }),

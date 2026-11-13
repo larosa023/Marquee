@@ -260,6 +260,14 @@ pub async fn dispatch(ctx: &Arc<Ctx>, method: &str, p: Value) -> Result<Value> {
         }
         "tracked_shows" => json!(feeds::tracked_shows(c)?),
         "calendar" => json!(feeds::calendar(c, text(&p, "from")?, text(&p, "to")?, opt(&p, "scope").unwrap_or("taste"))?),
+        "surprise" => {
+            let media = match opt(&p, "media") {
+                None | Some("any") => None,
+                Some(m) => Some(Media::parse(m).ok_or_else(|| Error::msg("Unknown media type."))?),
+            };
+            let skip: Vec<i64> = p["skip"].as_array().map(|a| a.iter().filter_map(|v| v.as_i64()).collect()).unwrap_or_default();
+            json!(feeds::surprise(c, media, p["upcoming"].as_bool().unwrap_or(false), &skip)?)
+        }
         "quick_rate" => json!(feeds::quick_rate(c, p["limit"].as_u64().unwrap_or(24) as usize)?),
         "today" => json!(feeds::today_releases(c, p["limit"].as_i64().unwrap_or(8))?),
         "item" => feeds::detail(c, int(&p, "id")?).await?,

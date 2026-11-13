@@ -25,6 +25,7 @@ const Settings = lazy(() => import('./features/settings/Settings'));
 const Detail = lazy(() => import('./features/detail/Detail'));
 const Onboarding = lazy(() => import('./features/onboarding/Onboarding'));
 const Tray = lazy(() => import('./features/tray/Tray'));
+const Surprise = lazy(() => import('./features/surprise/Surprise'));
 const UpdateModal = lazy(() => import('./features/settings/DataSections').then((m) => ({ default: m.UpdateModal })));
 
 const queryClient = new QueryClient({
@@ -330,6 +331,7 @@ function Shell() {
         <CrashNotice />
         <Suspense fallback={null}>
           <UpdateModal />
+          <Surprise />
         </Suspense>
       </LayoutGroup>
     );

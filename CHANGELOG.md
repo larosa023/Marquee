@@ -2,6 +2,17 @@
 
 All notable changes to Marquee are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.1.5
+
+### Surprise me
+- New "Surprise me" dialog: roll a random movie, show, game, album or anything at all, for when you need a spark.
+- Picks come from titles you'd probably like and haven't seen, played or heard yet, leaning toward your best matches. The taste dial widens the pool: Comfort rolls from your top 60, Adventurous from your top 400.
+- Each pick shows its poster, match and reason, with Open and Save for later. Roll again (or press R) for a new one; re-rolls don't repeat your last 30 picks. Out-now only by default, with a switch to include upcoming titles.
+- Find it in the "Need a spark?" strip on Home, the Surprise me button on Movies, TV, Games and Music, and the command palette (Ctrl+K → "Surprise me").
+
+### Fixed
+- Text on gold (primary) buttons was near-white instead of dark, which made it hard to read. It now has full contrast in every theme.
+
 ## 0.1.4
 
 ### Posters load much faster
