@@ -67,6 +67,7 @@ pub enum TagSource {
     Lastfm,
     MusicBrainz,
     Import,
+    Mal,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]

@@ -418,7 +418,7 @@ export default function Onboarding() {
 
   let body: ReactNode;
   if (step === 'welcome') body = <Welcome next={() => go(1)} />;
-  else if (step === 'connect') body = <ConnectionsList compact only={['steam', 'trakt', 'spotify', 'lastfm', 'letterboxd']} />;
+  else if (step === 'connect') body = <ConnectionsList compact only={['steam', 'trakt', 'spotify', 'lastfm', 'letterboxd', 'mal']} />;
   else if (step === 'import') body = <ConnectionsList compact only={['import', 'serializd']} />;
   else if (step === 'love') body = <Love picked={picked} setPicked={setPicked} />;
   else if (step === 'region') body = <RegionStep />;

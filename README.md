@@ -26,6 +26,8 @@ _Screenshots go here once the first release is installed. Suggested set: Home, a
 - **Lists**: Watchlist, Play Later, Listen Later, Favorites and custom lists; mirror a Trakt watchlist, Steam wishlist or Spotify playlist; share as an image or Markdown.
 - **Your Taste**: what Marquee has learned, shown plainly, with pins, blocks and per-source weights.
 - **Search** across everything, and **vibe search** ("a short cozy game for a rainy Sunday").
+- **Anime from MyAnimeList**: your list, scores and Plan to Watch feed your taste, each season's new anime shows up in the feeds, and you can add, complete and score anime from Marquee.
+- **IMDb episode ratings**, the same numbers SeriesGraph charts, in every show's episode heatmap.
 - **Optional local AI** through [Ollama](https://ollama.com): natural-language vibe search, written blurbs, local embeddings.
 - Windows notifications, a tray panel, a Ctrl+K command palette, eight themes plus a live theme editor, backup and restore, and a signed updater with rollback.
 
@@ -49,6 +51,7 @@ Marquee talks to each service directly from your PC, and each service wants a ke
 | `SPOTIFY_CLIENT_ID` | Spotify sign-in | [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) | Redirect URI: `http://127.0.0.1:43117/spotify`. Tick "Web API". No client secret is used. See the Spotify note in KNOWN_LIMITATIONS.md. |
 | `TRAKT_CLIENT_ID`, `TRAKT_CLIENT_SECRET` | Trakt sign-in | [trakt.tv/oauth/applications](https://trakt.tv/oauth/applications) | Redirect URI: `urn:ietf:wg:oauth:2.0:oob`. |
 | `STEAM_API_KEY` | Your Steam library and wishlist | [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey) | Any domain name works. |
+| `MAL_CLIENT_ID` | Your MyAnimeList list and each season's new anime | [myanimelist.net/apiconfig](https://myanimelist.net/apiconfig) | Click "Create ID". App Type: **other**. App Redirect URL: `http://127.0.0.1:43117/mal`. Homepage URL: `https://github.com/larosa023/Marquee`. Fill in the rest however you like. An "other" app has no secret; `MAL_CLIENT_SECRET` is only for a "web" app. |
 | `ITAD_API_KEY` | All-time low game prices (optional) | [isthereanydeal.com/apps/my](https://isthereanydeal.com/apps/my/) | Without it Marquee shows the lowest price it has seen itself. |
 
 Movies and TV need TMDB, games need IGDB, and music needs Last.fm. A missing key only switches off what depends on it; the screen says which key to add.
@@ -104,7 +107,7 @@ Your data lives in `%LOCALAPPDATA%\com.larosa023.marquee\data` (or wherever you 
 One-time setup:
 
 1. **Update signing key.** From the repo root run `powershell -ExecutionPolicy Bypass -File scripts\setup-signing.ps1`. It creates the key pair, writes the public key into `src-tauri/tauri.conf.json` (commit that), and stores `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` as repository secrets. Back up `%USERPROFILE%\.tauri\marquee.key` and its password; without them, installed copies can't be updated in place.
-2. **API keys as secrets** (optional, see above): `TMDB_API_KEY`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `LASTFM_API_KEY`, `LASTFM_API_SECRET`, `SPOTIFY_CLIENT_ID`, `TRAKT_CLIENT_ID`, `TRAKT_CLIENT_SECRET`, `STEAM_API_KEY`, `ITAD_API_KEY`.
+2. **API keys as secrets** (optional, see above): `TMDB_API_KEY`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `LASTFM_API_KEY`, `LASTFM_API_SECRET`, `SPOTIFY_CLIENT_ID`, `TRAKT_CLIENT_ID`, `TRAKT_CLIENT_SECRET`, `STEAM_API_KEY`, `ITAD_API_KEY`, `MAL_CLIENT_ID`, `MAL_CLIENT_SECRET`.
 3. **Code-signing certificate** (optional): `WINDOWS_CERTIFICATE` (a base64-encoded `.pfx`) and `WINDOWS_CERTIFICATE_PASSWORD`. Without one the installer works but Windows SmartScreen warns the first time it runs. Updates are signed and verified either way.
 
 Each release:
@@ -133,7 +136,7 @@ Hangar finds apps through its own `manifest.json`. To list Marquee there, add th
 
 ## Credits
 
-Movie and TV data from [TMDB](https://www.themoviedb.org) (this product uses the TMDB API but is not endorsed or certified by TMDB), with availability from JustWatch. Game data from [IGDB](https://www.igdb.com). Music data from [MusicBrainz](https://musicbrainz.org), the [Cover Art Archive](https://coverartarchive.org) and [Last.fm](https://www.last.fm). Prices and reviews from Steam. Marquee is not affiliated with any of these services, or with Letterboxd, Trakt, Spotify, Serializd or SeriesGraph.
+Movie and TV data from [TMDB](https://www.themoviedb.org) (this product uses the TMDB API but is not endorsed or certified by TMDB), with availability from JustWatch. Game data from [IGDB](https://www.igdb.com). Music data from [MusicBrainz](https://musicbrainz.org), the [Cover Art Archive](https://coverartarchive.org) and [Last.fm](https://www.last.fm). Prices and reviews from Steam. Episode and show ratings: information courtesy of IMDb (https://www.imdb.com), used with permission. Anime data from [MyAnimeList](https://myanimelist.net). Marquee is not affiliated with any of these services, or with Letterboxd, Trakt, Spotify, MyAnimeList, Serializd or SeriesGraph.
 
 ## License
 

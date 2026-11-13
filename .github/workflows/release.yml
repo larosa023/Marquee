@@ -35,6 +35,8 @@ jobs:
       TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
       STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
       ITAD_API_KEY: ${{ secrets.ITAD_API_KEY }}
+      MAL_CLIENT_ID: ${{ secrets.MAL_CLIENT_ID }}
+      MAL_CLIENT_SECRET: ${{ secrets.MAL_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v4
 
@@ -94,8 +96,15 @@ jobs:
           "signed=true" >> $env:GITHUB_OUTPUT
 
       - name: Release notes from the changelog
+        id: notes
         shell: pwsh
-        run: node scripts/release-notes.mjs "${{ steps.v.outputs.version }}" > release-notes.md
+        run: |
+          node scripts/release-notes.mjs "${{ steps.v.outputs.version }}" > release-notes.md
+          # Also handed to the build, so latest.json (what the in-app "What's new" shows) carries them.
+          $delim = "NOTES_" + [guid]::NewGuid().ToString("N")
+          "body<<$delim" >> $env:GITHUB_OUTPUT
+          Get-Content release-notes.md >> $env:GITHUB_OUTPUT
+          $delim >> $env:GITHUB_OUTPUT
 
       - name: Build, sign and publish
         uses: tauri-apps/tauri-action@v0
@@ -107,7 +116,7 @@ jobs:
           projectPath: .
           tagName: v__VERSION__
           releaseName: 'Marquee v__VERSION__'
-          releaseBody: ${{ format('See CHANGELOG.md for what changed in {0}.', steps.v.outputs.version) }}
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: ${{ steps.v.outputs.prerelease }}
           includeUpdaterJson: true

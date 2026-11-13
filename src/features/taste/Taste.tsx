@@ -47,7 +47,7 @@ export interface TasteData {
 const SERIES: Record<Media, string> = { movie: 'var(--series-1)', tv: 'var(--series-2)', game: 'var(--series-3)', album: 'var(--series-4)' };
 const ORDER: Media[] = ['movie', 'tv', 'game', 'album'];
 const NAME: Record<Media, string> = { movie: 'Movies', tv: 'TV', game: 'Games', album: 'Music' };
-const SOURCE_NAME: Record<string, string> = { marquee: 'Ratings and feedback in Marquee', steam: 'Steam', trakt: 'Trakt', letterboxd: 'Letterboxd', spotify: 'Spotify', lastfm: 'Last.fm', import: 'Imported files', serializd: 'Serializd' };
+const SOURCE_NAME: Record<string, string> = { marquee: 'Ratings and feedback in Marquee', steam: 'Steam', trakt: 'Trakt', letterboxd: 'Letterboxd', spotify: 'Spotify', lastfm: 'Last.fm', import: 'Imported files', serializd: 'Serializd', mal: 'MyAnimeList' };
 const ROLE: Record<string, string> = { director: 'Director', writer: 'Writer', creator: 'Creator', composer: 'Composer', studio: 'Studio', network: 'Network', developer: 'Developer', publisher: 'Publisher', artist: 'Artist', label: 'Label', cast: 'Actor' };
 
 function Panel({ title, hint, children, action, className }: { title: string; hint?: ReactNode; children: ReactNode; action?: ReactNode; className?: string }) {

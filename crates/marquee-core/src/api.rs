@@ -161,7 +161,7 @@ fn storage(ctx: &Ctx) -> Value {
     let db_bytes = ctx.db.path().and_then(|p| std::fs::metadata(p).ok()).map(|m| m.len()).unwrap_or(0);
     let cache_rows: i64 = ctx.db.lock().query_row("SELECT count(*) FROM cache", [], |r| r.get(0)).unwrap_or(0);
     let backups: u64 = backup::list(ctx).iter().map(|b| b.bytes).sum();
-    json!({ "images_bytes": image_bytes, "images": image_count, "image_cap_bytes": images::cap_bytes(ctx), "database_bytes": db_bytes, "cached_responses": cache_rows, "backups_bytes": backups, "data_dir": ctx.data_dir.to_string_lossy() })
+    json!({ "images_bytes": image_bytes, "images": image_count, "image_cap_bytes": images::cap_bytes(ctx), "database_bytes": db_bytes, "cached_responses": cache_rows, "backups_bytes": backups, "imdb_bytes": catalog::imdb::size_bytes(&ctx.data_dir), "imdb_updated_at": store::get_setting::<String>(&ctx.db, "imdb.updated_at"), "data_dir": ctx.data_dir.to_string_lossy() })
 }
 
 fn diagnostics(ctx: &Ctx) -> Result<String> {
@@ -231,6 +231,15 @@ pub async fn dispatch(ctx: &Arc<Ctx>, method: &str, p: Value) -> Result<Value> {
         "cache.clear" => {
             images::clear(c)?;
             c.http.clear_cache()?;
+            storage(c)
+        }
+        "imdb.refresh" => {
+            let episodes = catalog::imdb::refresh(c).await?;
+            json!({ "episodes": episodes, "storage": storage(c) })
+        }
+        "imdb.remove" => {
+            catalog::imdb::remove(&c.data_dir);
+            store::set_setting(&c.db, "imdb.enabled", &false)?;
             storage(c)
         }
         "diagnostics" => json!(diagnostics(c)?),
@@ -462,6 +471,8 @@ pub async fn dispatch(ctx: &Arc<Ctx>, method: &str, p: Value) -> Result<Value> {
         "connect.lastfm.auth_start" => json!({ "token": integrations::lastfm::auth_start(c).await? }),
         "connect.lastfm.auth_finish" => json!({ "account": integrations::lastfm::auth_finish(c, text(&p, "token")?).await? }),
         "connect.letterboxd" => json!({ "account": letterboxd::connect(c, text(&p, "username")?).await? }),
+        "connect.mal" => json!({ "account": integrations::mal::connect(c, text(&p, "username")?).await? }),
+        "connect.mal.signin" => json!({ "account": integrations::mal::sign_in(c).await? }),
         "disconnect" => {
             let source = text(&p, "source")?;
             if let Some(src) = integrations::get(source) {
@@ -614,7 +625,7 @@ mod tests {
         assert_eq!(b["onboarded"], false);
         assert_eq!(b["has_taste"], false);
         assert_eq!(b["lists"].as_array().unwrap().len(), 4);
-        assert_eq!(b["sources"].as_array().unwrap().len(), 7);
+        assert_eq!(b["sources"].as_array().unwrap().len(), 8);
         assert!(b["themes"].as_array().unwrap().len() >= 9);
         assert!(b["keys"].as_array().unwrap().iter().all(|k| k["set"] == true && k["custom"] == false));
         // Key values never appear anywhere in what the UI receives.

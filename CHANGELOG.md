@@ -2,6 +2,19 @@
 
 All notable changes to Marquee are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.1.2
+
+### New
+
+- **MyAnimeList.** Connect with your username to bring your anime list, scores and Plan to Watch into your taste profile, or sign in to also add anime to Plan to Watch, mark them completed and score them from Marquee. Each season's new anime appears in the feeds and calendar, and anime pages link to MyAnimeList with its score.
+- **IMDb episode ratings, the data SeriesGraph charts.** Show heatmaps now use IMDb's episode ratings, downloaded from IMDb's public datasets once a week and kept on your PC. The show's IMDb rating appears beside the heatmap. Turn it off in Settings → General.
+- Anime genres and themes (slice of life, isekai, shounen, iyashikei and more) now feed the cross-media taste, so a love of anime can surface games and music with the same mood.
+
+### Fixed
+
+- The "View episode ratings graph on SeriesGraph" button now opens the show's page in SeriesGraph's own address format.
+- The "What's new" dialog for an update now shows the full release notes instead of one line.
+
 ## 0.1.1
 
 The first release. (There is no 0.1.0 build: that tag was taken before the code was ready.)

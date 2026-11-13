@@ -70,4 +70,16 @@ describe('Settings', () => {
     await waitFor(() => expect(within(row).queryByLabelText('TMDB API key')).not.toBeInTheDocument());
     expect(document.body.textContent).not.toContain('secret-value');
   });
+
+  it('connects MyAnimeList with a username, then signs in to allow updates', async () => {
+    await boot();
+    renderApp(<Settings section="connections" />);
+    const row = screen.getByText('MyAnimeList').closest('li')!;
+    await userEvent.click(within(row).getByRole('button', { name: 'Connect' }));
+    const dialog = screen.getByRole('dialog', { name: 'Connect MyAnimeList' });
+    await userEvent.type(within(dialog).getByLabelText('MyAnimeList username'), 'larosa{Enter}');
+    await waitFor(() => expect(backend.calls.some((c) => c.method === 'connect.mal' && c.params.username === 'larosa')).toBe(true));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Sign in with MyAnimeList' }));
+    await waitFor(() => expect(backend.calls.some((c) => c.method === 'connect.mal.signin')).toBe(true));
+  });
 });

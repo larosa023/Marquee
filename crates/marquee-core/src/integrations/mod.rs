@@ -4,6 +4,7 @@
 pub mod import;
 pub mod lastfm;
 pub mod letterboxd;
+pub mod mal;
 pub mod oauth;
 pub mod spotify;
 pub mod steam;
@@ -95,7 +96,7 @@ pub trait Source: Send + Sync {
 }
 
 pub fn all() -> Vec<Box<dyn Source>> {
-    vec![Box::new(steam::Steam), Box::new(letterboxd::Letterboxd), Box::new(trakt::Trakt), Box::new(spotify::Spotify), Box::new(lastfm::Lastfm)]
+    vec![Box::new(steam::Steam), Box::new(letterboxd::Letterboxd), Box::new(trakt::Trakt), Box::new(spotify::Spotify), Box::new(lastfm::Lastfm), Box::new(mal::Mal)]
 }
 
 pub fn get(id: &str) -> Option<Box<dyn Source>> {

@@ -33,6 +33,7 @@ interface DetailData {
   targets: { id: string; label: string; hint?: string; ready: boolean }[];
   seriesgraph: string | null;
   letterboxd: string | null;
+  mal: string | null;
   offline: boolean;
   note: string | null;
 }
@@ -245,7 +246,7 @@ function People({ data }: { data: Record<string, any> }) {
   );
 }
 
-const SOURCE_NAME: Record<string, string> = { marquee: 'Marquee', steam: 'Steam', trakt: 'Trakt', letterboxd: 'Letterboxd', spotify: 'Spotify', lastfm: 'Last.fm', import: 'an import', serializd: 'Serializd' };
+const SOURCE_NAME: Record<string, string> = { marquee: 'Marquee', steam: 'Steam', trakt: 'Trakt', letterboxd: 'Letterboxd', spotify: 'Spotify', lastfm: 'Last.fm', import: 'an import', serializd: 'Serializd', mal: 'MyAnimeList' };
 
 function describeEvent(e: DetailData['events'][number], media: Media): string | null {
   const from = SOURCE_NAME[e.source] ?? e.source;
@@ -309,7 +310,13 @@ export default function Detail({ id }: { id: number }) {
   }, [qc, id]);
 
   const { data, error, refetch } = useQuery({ queryKey: ['item', id], queryFn: () => api<DetailData>('item', { id }), staleTime: 60_000 });
-  const episodes = useQuery({ queryKey: ['episodes', id], queryFn: () => api<{ seasons: any[][]; average: number | null }>('item.episodes', { id }), enabled: data?.item.media === 'tv' && !!data.item.ids.tmdb, staleTime: 3_600_000, retry: false });
+  const episodes = useQuery({
+    queryKey: ['episodes', id],
+    queryFn: () => api<{ seasons: any[][]; average: number | null; source: 'IMDb' | 'TMDB'; imdb: { rating: number; votes: number; url: string | null } | null; attribution: string | null }>('item.episodes', { id }),
+    enabled: data?.item.media === 'tv' && !!(data.item.ids.tmdb || data.item.ids.imdb),
+    staleTime: 3_600_000,
+    retry: false,
+  });
   const aiOn = useApp((s) => s.boot?.settings['ai']?.enabled !== false);
   const blurb = useQuery({ queryKey: ['blurb', id], queryFn: () => api<{ blurb: string | null }>('item.blurb', { id }), enabled: !!data && aiOn && data.why.length > 0, staleTime: Infinity, retry: false });
 
@@ -574,11 +581,20 @@ export default function Detail({ id }: { id: number }) {
 
               <Section title="Where to get it">
                 {media === 'game' ? <GameStore where={data.where} title={title} /> : media === 'album' ? <MusicLinks where={data.where} tracks={d.tracks} /> : <Providers where={data.where} />}
-                {media === 'movie' && data.letterboxd && (
-                  <Button className="mt-4" icon="external" onClick={() => void openUrl(data.letterboxd!)}>
-                    Open on Letterboxd
-                  </Button>
-                )}
+                {(data.letterboxd && media === 'movie') || data.mal ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {media === 'movie' && data.letterboxd && (
+                      <Button icon="external" onClick={() => void openUrl(data.letterboxd!)}>
+                        Open on Letterboxd
+                      </Button>
+                    )}
+                    {data.mal && (
+                      <Button icon="external" onClick={() => void openUrl(data.mal!)}>
+                        Open on MyAnimeList{typeof d.mal_score === 'number' ? ` · ${d.mal_score.toFixed(2)}` : ''}
+                      </Button>
+                    )}
+                  </div>
+                ) : null}
               </Section>
 
               {d.trailer && (
@@ -588,7 +604,10 @@ export default function Detail({ id }: { id: number }) {
               )}
 
               {media === 'tv' && (
-                <Section title="Seasons and episode ratings" hint={episodes.data?.average ? `Average episode ${episodes.data.average}/10 · ratings from TMDB` : undefined}>
+                <Section
+                  title="Seasons and episode ratings"
+                  hint={episodes.data?.average ? `Average episode ${episodes.data.average}/10 · ratings from ${episodes.data.source}${episodes.data.imdb ? ` · show ${episodes.data.imdb.rating.toFixed(1)}/10 on IMDb from ${episodes.data.imdb.votes.toLocaleString()} votes` : ''}` : undefined}
+                >
                   {Array.isArray(d.seasons) && d.seasons.length > 0 && (
                     <ul className="no-scrollbar mb-5 flex gap-3 overflow-x-auto pb-1">
                       {d.seasons.map((s: any) => (
@@ -616,11 +635,19 @@ export default function Detail({ id }: { id: number }) {
                   ) : (
                     <p className="text-subtext">Episode ratings aren't available for this show{data.offline ? ' while offline' : ''}.</p>
                   )}
-                  {data.seriesgraph && (
-                    <Button className="mt-4" icon="chart" onClick={() => void openUrl(data.seriesgraph!)}>
-                      View episode ratings graph on SeriesGraph
-                    </Button>
-                  )}
+                  {episodes.data?.attribution && <p className="mt-2 text-[12px] text-faint">{episodes.data.attribution}</p>}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {data.seriesgraph && (
+                      <Button icon="chart" onClick={() => void openUrl(data.seriesgraph!)}>
+                        View episode ratings graph on SeriesGraph
+                      </Button>
+                    )}
+                    {episodes.data?.imdb?.url && (
+                      <Button icon="external" onClick={() => void openUrl(episodes.data!.imdb!.url!)}>
+                        IMDb
+                      </Button>
+                    )}
+                  </div>
                 </Section>
               )}
 

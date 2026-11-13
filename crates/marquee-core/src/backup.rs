@@ -275,6 +275,7 @@ pub fn delete_everything(ctx: &Ctx) -> Result<()> {
         }
     }
     let _ = std::fs::remove_file(ctx.data_dir.join("marquee.ics"));
+    crate::catalog::imdb::remove(&ctx.data_dir);
     ctx.emit("data:restored", json!({ "wiped": true }));
     Ok(())
 }

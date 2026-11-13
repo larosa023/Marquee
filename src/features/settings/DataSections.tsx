@@ -17,6 +17,8 @@ interface Storage {
   database_bytes: number;
   cached_responses: number;
   backups_bytes: number;
+  imdb_bytes: number;
+  imdb_updated_at: string | null;
   data_dir: string;
 }
 
@@ -29,6 +31,7 @@ export function StorageSection() {
   const [wipe, setWipe] = useState(false);
   const [typed, setTyped] = useState('');
   const [moving, setMoving] = useState<string | null>(null);
+  const [imdbBusy, setImdbBusy] = useState(false);
 
   const exportLibrary = async (format: 'csv' | 'json') => {
     const path = await pickSave(`marquee-library.${format}`, [{ name: format.toUpperCase(), extensions: [format] }]);
@@ -72,6 +75,31 @@ export function StorageSection() {
                 <dd className="font-medium">{bytes(data.backups_bytes)}</dd>
               </div>
             </dl>
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-white/8 pt-3 text-[13px]">
+              <span className="min-w-0 flex-1 text-subtext">
+                IMDb episode ratings: <span className="tnum font-medium text-text">{data.imdb_bytes > 0 ? bytes(data.imdb_bytes) : 'not downloaded'}</span>
+                {data.imdb_updated_at ? ` · updated ${ago(data.imdb_updated_at)}` : ''}
+              </span>
+              <Button
+                size="sm"
+                icon="sync"
+                busy={imdbBusy}
+                onClick={() => {
+                  setImdbBusy(true);
+                  void api<{ episodes: number }>('imdb.refresh')
+                    .then((r) => toast(`IMDb ratings updated: ${r.episodes.toLocaleString()} episodes`, 'good'))
+                    .catch((e) => toast(errorMessage(e), 'bad'))
+                    .finally(() => (setImdbBusy(false), void refetch()));
+                }}
+              >
+                {data.imdb_bytes > 0 ? 'Update now' : 'Download now'}
+              </Button>
+              {data.imdb_bytes > 0 && (
+                <Button size="sm" variant="ghost" icon="trash" onClick={() => void api('imdb.remove').then(() => (toast('IMDb ratings removed and turned off', 'info'), refetch(), useApp.getState().refreshBoot()))}>
+                  Remove
+                </Button>
+              )}
+            </div>
           </>
         )}
       </div>

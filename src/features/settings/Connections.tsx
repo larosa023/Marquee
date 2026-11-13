@@ -13,8 +13,8 @@ import { Modal } from '@/ui/overlays';
 import { Badge, Button, Input, Toggle, cx } from '@/ui/primitives';
 import { useImporter } from './Import';
 
-const SOURCE_ICON: Record<string, IconName> = { steam: 'gamepad', trakt: 'tv', spotify: 'music', lastfm: 'music', letterboxd: 'film', serializd: 'tv', import: 'upload' };
-const SOURCE_KEYS: Record<string, string[]> = { steam: ['steam'], trakt: ['trakt_client_id', 'trakt_client_secret'], spotify: ['spotify_client_id'], lastfm: ['lastfm_key'], letterboxd: [], serializd: [], import: [] };
+const SOURCE_ICON: Record<string, IconName> = { steam: 'gamepad', trakt: 'tv', spotify: 'music', lastfm: 'music', letterboxd: 'film', mal: 'tv', serializd: 'tv', import: 'upload' };
+const SOURCE_KEYS: Record<string, string[]> = { steam: ['steam'], trakt: ['trakt_client_id', 'trakt_client_secret'], spotify: ['spotify_client_id'], lastfm: ['lastfm_key'], letterboxd: [], mal: ['mal_client_id'], serializd: [], import: [] };
 
 function useAfterConnect() {
   const qc = useQueryClient();
@@ -255,6 +255,35 @@ function ConnectModal({ source, onClose }: { source: SourceStatus; onClose: () =
         </div>
       </>
     );
+  } else if (source.id === 'mal') {
+    const connected = source.status !== 'disconnected';
+    body =
+      busy === 'signin' ? (
+        <Waiting service="MyAnimeList" onCancel={onClose} />
+      ) : (
+        <>
+          <p className="text-subtext">Your username is enough to read a public anime list: scores, what you've watched, and your Plan to Watch.</p>
+          <div className="mt-3 flex gap-2">
+            <Input data-autofocus className="flex-1" aria-label="MyAnimeList username" placeholder="MyAnimeList username" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && text && void run('user', () => api('connect.mal', { username: text }), false)} />
+            <Button variant={connected ? 'secondary' : 'primary'} busy={busy === 'user'} disabled={!text.trim()} onClick={() => void run('user', () => api('connect.mal', { username: text }), false)}>
+              {connected ? 'Change' : 'Connect'}
+            </Button>
+          </div>
+          <div className="mt-6 rounded-control bg-surface p-4">
+            <p className="font-medium">Let Marquee update your list</p>
+            <p className="mt-1 text-[13px] text-subtext">Sign in on MyAnimeList's own site to add anime to Plan to Watch, mark them completed and score them from Marquee. Signing in also reads a private list.</p>
+            {source.config?.can_write ? (
+              <p className="mt-3 flex items-center gap-2 text-[13px] text-good">
+                <Icon name="check" size={15} /> Signed in
+              </p>
+            ) : (
+              <Button className="mt-3" icon="external" onClick={() => void run('signin', () => api('connect.mal.signin'))}>
+                Sign in with MyAnimeList
+              </Button>
+            )}
+          </div>
+        </>
+      );
   } else if (source.id === 'letterboxd') {
     const counts = source.config?.export_counts as Record<string, number> | undefined;
     body = (
@@ -387,7 +416,7 @@ function SourceCard({ s, keys, compact, onConnect, onKeys }: { s: SourceStatus; 
               >
                 Sync
               </Button>
-              <Button onClick={onConnect}>{s.status === 'error' ? 'Reconnect' : s.id === 'letterboxd' || s.id === 'lastfm' ? 'Manage' : 'Reconnect'}</Button>
+              <Button onClick={onConnect}>{s.status === 'error' ? 'Reconnect' : s.id === 'letterboxd' || s.id === 'lastfm' || s.id === 'mal' ? 'Manage' : 'Reconnect'}</Button>
             </>
           ) : (
             <Button variant="primary" onClick={onConnect}>
@@ -504,6 +533,9 @@ export function ConnectionsList({ compact, only }: { compact?: boolean; only?: s
 
 // ------------------------------------------------------------------ API keys
 
+/** Keys whose absence turns nothing off. */
+const OPTIONAL_KEYS = ['itad', 'mal_client_secret'];
+
 const KEY_LABEL: Record<string, string> = {
   tmdb: 'TMDB API key',
   igdb_client_id: 'Twitch client ID (for IGDB)',
@@ -515,6 +547,8 @@ const KEY_LABEL: Record<string, string> = {
   trakt_client_secret: 'Trakt client secret',
   steam: 'Steam Web API key',
   itad: 'IsThereAnyDeal API key',
+  mal_client_id: 'MyAnimeList client ID',
+  mal_client_secret: 'MyAnimeList client secret',
 };
 
 function KeyRow({ k }: { k: KeyStatus }) {
@@ -538,7 +572,7 @@ function KeyRow({ k }: { k: KeyStatus }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">{KEY_LABEL[k.name] ?? k.name}</span>
-            {k.custom ? <Badge tone="good">Your key</Badge> : k.set ? <Badge tone="accent">Built in</Badge> : <Badge tone={k.name === 'itad' ? 'neutral' : 'warn'}>{k.name === 'itad' ? 'Optional' : 'Missing'}</Badge>}
+            {k.custom ? <Badge tone="good">Your key</Badge> : k.set ? <Badge tone="accent">Built in</Badge> : <Badge tone={OPTIONAL_KEYS.includes(k.name) ? 'neutral' : 'warn'}>{OPTIONAL_KEYS.includes(k.name) ? 'Optional' : 'Missing'}</Badge>}
           </div>
           <p className="mt-0.5 text-[13px] text-subtext">{k.what}</p>
         </div>
