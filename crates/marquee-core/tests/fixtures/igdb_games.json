@@ -1,0 +1,33 @@
+[
+  {
+    "id": 11737, "name": "Outer Wilds", "url": "https://www.igdb.com/games/outer-wilds",
+    "summary": "An open world mystery about a solar system trapped in an endless time loop.",
+    "first_release_date": 1559001600,
+    "cover": {"id": 1, "image_id": "co65ac"},
+    "artworks": [{"id": 2, "image_id": "ar6f1"}],
+    "screenshots": [{"id": 3, "image_id": "sc6abc"}],
+    "genres": [{"id": 31, "name": "Adventure"}, {"id": 32, "name": "Indie"}, {"id": 9, "name": "Puzzle"}],
+    "themes": [{"id": 38, "name": "Open world"}, {"id": 18, "name": "Science fiction"}, {"id": 43, "name": "Mystery"}],
+    "keywords": [{"id": 1, "name": "space"}, {"id": 2, "name": "exploration"}, {"id": 3, "name": "time loop"}],
+    "game_modes": [{"id": 1, "name": "Single player"}],
+    "player_perspectives": [{"id": 1, "name": "First person"}],
+    "platforms": [{"id": 6, "abbreviation": "PC", "name": "PC (Microsoft Windows)"}, {"id": 48, "abbreviation": "PS4", "name": "PlayStation 4"}],
+    "involved_companies": [
+      {"id": 1, "company": {"id": 10, "name": "Mobius Digital"}, "developer": true, "publisher": false},
+      {"id": 2, "company": {"id": 11, "name": "Annapurna Interactive"}, "developer": false, "publisher": true}
+    ],
+    "similar_games": [{"id": 19164, "name": "Return of the Obra Dinn", "first_release_date": 1539820800, "cover": {"id": 9, "image_id": "co1r7b"}, "genres": [{"id": 9, "name": "Puzzle"}], "themes": [{"id": 43, "name": "Mystery"}]}],
+    "videos": [{"id": 1, "video_id": "d6LGnVCL1_A", "name": "Trailer"}],
+    "total_rating": 87.3, "total_rating_count": 1400, "hypes": 12,
+    "websites": [{"id": 1, "url": "https://store.steampowered.com/app/753640/Outer_Wilds/"}, {"id": 2, "url": "https://www.mobiusdigitalgames.com/outer-wilds.html"}],
+    "external_games": [{"id": 1, "uid": "753640", "url": "https://store.steampowered.com/app/753640"}],
+    "release_dates": [{"id": 1, "date": 1559001600, "human": "May 28, 2019", "platform": {"id": 6, "abbreviation": "PC"}}, {"id": 2, "date": 1571097600, "human": "Oct 15, 2019", "platform": {"id": 48, "abbreviation": "PS4"}}]
+  },
+  {
+    "id": 500001, "name": "Lantern Deep", "summary": "A cozy diving sim.", "first_release_date": 1795000000,
+    "cover": {"id": 5, "image_id": "co9zzz"},
+    "genres": [{"id": 13, "name": "Simulator"}], "themes": [], "keywords": [{"id": 9, "name": "cozy"}, {"id": 10, "name": "underwater"}],
+    "platforms": [{"id": 6, "abbreviation": "PC", "name": "PC (Microsoft Windows)"}],
+    "involved_companies": [], "hypes": 40, "total_rating_count": 0, "websites": [], "external_games": []
+  }
+]

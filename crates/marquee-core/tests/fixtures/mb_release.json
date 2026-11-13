@@ -1,0 +1,6 @@
+{"release-count": 1, "releases": [{"id": "rel-1", "title": "Dive", "status": "Official",
+  "label-info": [{"catalog-number": "GI-145", "label": {"id": "l1", "name": "Ghostly International"}}],
+  "media": [{"position": 1, "tracks": [
+    {"position": 1, "title": "A Walk", "length": 316000, "recording": {"length": 316000}},
+    {"position": 2, "title": "Hours", "length": null, "recording": {"length": 252000}}
+  ]}]}]}

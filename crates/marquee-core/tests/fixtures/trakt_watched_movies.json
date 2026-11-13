@@ -1,0 +1,6 @@
+[
+  {"plays": 2, "last_watched_at": "2025-01-10T20:00:00.000Z", "last_updated_at": "2025-01-10T20:00:00.000Z",
+   "movie": {"title": "Arrival", "year": 2016, "ids": {"trakt": 1, "slug": "arrival-2016", "imdb": "tt2543164", "tmdb": 329865}}},
+  {"plays": 1, "last_watched_at": "2024-06-02T21:30:00.000Z", "last_updated_at": "2024-06-02T21:30:00.000Z",
+   "movie": {"title": "Blade Runner 2049", "year": 2017, "ids": {"trakt": 2, "slug": "blade-runner-2049-2017", "imdb": "tt1856101", "tmdb": 335984}}}
+]

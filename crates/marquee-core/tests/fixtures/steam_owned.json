@@ -1,0 +1,4 @@
+{"response": {"game_count": 2, "games": [
+  {"appid": 753640, "name": "Outer Wilds", "playtime_forever": 1320, "playtime_2weeks": 95, "img_icon_url": "abc", "rtime_last_played": 1762000000},
+  {"appid": 620, "name": "Portal 2", "playtime_forever": 0, "img_icon_url": "def", "rtime_last_played": 0}
+]}}

@@ -1,0 +1,7 @@
+{
+  "page": 1, "total_pages": 1, "total_results": 2,
+  "results": [
+    {"id": 900001, "title": "Signal Lost", "release_date": "2026-11-20", "overview": "A deep-space relay goes quiet.", "poster_path": "/sl.jpg", "backdrop_path": "/slb.jpg", "genre_ids": [878, 53], "popularity": 88.0, "vote_average": 0, "vote_count": 0, "original_language": "en"},
+    {"id": 900002, "title": "The Long Table", "release_date": "2026-12-04", "overview": "A family dinner, one take.", "poster_path": "/lt.jpg", "backdrop_path": null, "genre_ids": [35, 18], "popularity": 41.5, "vote_average": 7.1, "vote_count": 12, "original_language": "fr"}
+  ]
+}
