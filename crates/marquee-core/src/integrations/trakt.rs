@@ -24,12 +24,7 @@ const PAGE: &str = "250";
 pub struct Trakt;
 
 fn call<'a>(ctx: &'a Ctx, method: &str, path: &str, client_id: &str) -> crate::net::Call<'a> {
-    ctx.http
-        .request("Trakt", method, format!("{API}{path}"))
-        .header("Content-Type", "application/json")
-        .header("trakt-api-version", "2")
-        .header("trakt-api-key", client_id)
-        .header("User-Agent", ctx.user_agent())
+    ctx.http.request("Trakt", method, format!("{API}{path}")).header("Content-Type", "application/json").header("trakt-api-version", "2").header("trakt-api-key", client_id).header("User-Agent", ctx.user_agent())
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -46,9 +41,9 @@ pub async fn device_start(ctx: &Ctx) -> Result<DeviceCode> {
     let id = ctx.require_key("trakt_client_id")?;
     ctx.require_key("trakt_client_secret")?;
     let v: Value = call(ctx, "POST", "/oauth/device/code", &id).json_body(&json!({ "client_id": id })).json().await.map_err(|e| match e {
-        Error::Api { status: 403 | 404, .. } | Error::Reauth(_) => Error::NotConfigured(
-            "Trakt didn't recognise the client ID. Trakt now requires a VIP account to create API apps; check the app still exists at trakt.tv/oauth/applications.".into(),
-        ),
+        Error::Api { status: 403 | 404, .. } | Error::Reauth(_) => {
+            Error::NotConfigured("Trakt didn't recognise the client ID. Trakt now requires a VIP account to create API apps; check the app still exists at trakt.tv/oauth/applications.".into())
+        }
         other => other,
     })?;
     let code = DeviceCode {
@@ -105,14 +100,13 @@ async fn token(ctx: &Ctx) -> Result<String> {
     let refresh = ctx.secrets.get("trakt.refresh").ok_or_else(|| Error::Reauth("Trakt".into()))?;
     let id = ctx.require_key("trakt_client_id")?;
     let secret = ctx.require_key("trakt_client_secret")?;
-    let v: Value = call(ctx, "POST", "/oauth/token", &id)
-        .json_body(&json!({ "refresh_token": refresh, "client_id": id, "client_secret": secret, "redirect_uri": "urn:ietf:wg:oauth:2.0:oob", "grant_type": "refresh_token" }))
-        .json()
-        .await
-        .map_err(|e| match e {
-            Error::Api { status: 400 | 401 | 403, .. } => Error::Reauth("Trakt".into()),
-            other => other,
-        })?;
+    let v: Value =
+        call(ctx, "POST", "/oauth/token", &id).json_body(&json!({ "refresh_token": refresh, "client_id": id, "client_secret": secret, "redirect_uri": "urn:ietf:wg:oauth:2.0:oob", "grant_type": "refresh_token" })).json().await.map_err(
+            |e| match e {
+                Error::Api { status: 400 | 401 | 403, .. } => Error::Reauth("Trakt".into()),
+                other => other,
+            },
+        )?;
     save_tokens(ctx, &v)?;
     s(&v, "access_token").ok_or_else(|| Error::Reauth("Trakt".into()))
 }
@@ -146,7 +140,13 @@ async fn all_pages(ctx: &Ctx, path: &str, extra: &[(&str, &str)]) -> Result<Vec<
 
 /// A draft from Trakt's `{ "movie": {...} }` / `{ "show": {...} }` wrapper.
 fn draft(row: &Value) -> Option<ItemDraft> {
-    let (media, obj) = if row["movie"].is_object() { (Media::Movie, &row["movie"]) } else if row["show"].is_object() { (Media::Tv, &row["show"]) } else { return None };
+    let (media, obj) = if row["movie"].is_object() {
+        (Media::Movie, &row["movie"])
+    } else if row["show"].is_object() {
+        (Media::Tv, &row["show"])
+    } else {
+        return None;
+    };
     let ids = &obj["ids"];
     let mut d = ItemDraft::new(media, s(obj, "title")?);
     // TMDB first: it's the id the rest of the catalog is keyed on.
@@ -321,7 +321,12 @@ mod tests {
     async fn sync_follows_pagination_and_converts_ratings() {
         let t = signed_in();
         t.net.on_with_headers("/sync/watched/movies?page=1", 200, &[("X-Pagination-Page-Count", "2")], include_str!("../../tests/fixtures/trakt_watched_movies.json"));
-        t.net.on_with_headers("/sync/watched/movies?page=2", 200, &[("X-Pagination-Page-Count", "2")], r#"[{"plays":1,"last_watched_at":"2025-02-01T00:00:00.000Z","movie":{"title":"Ex Machina","year":2015,"ids":{"trakt":3,"imdb":"tt0470752","tmdb":264660}}}]"#);
+        t.net.on_with_headers(
+            "/sync/watched/movies?page=2",
+            200,
+            &[("X-Pagination-Page-Count", "2")],
+            r#"[{"plays":1,"last_watched_at":"2025-02-01T00:00:00.000Z","movie":{"title":"Ex Machina","year":2015,"ids":{"trakt":3,"imdb":"tt0470752","tmdb":264660}}}]"#,
+        );
         t.net.on("/sync/ratings/shows", 200, r#"[{"rated_at":"2025-03-01T00:00:00.000Z","rating":9,"type":"show","show":{"title":"Severance","year":2022,"ids":{"trakt":9,"tmdb":95396}}}]"#);
         t.net.on("/sync/watchlist/movies", 200, r#"[{"rank":1,"listed_at":"2026-01-01T00:00:00.000Z","type":"movie","movie":{"title":"Dune: Part Three","year":2026,"ids":{"trakt":77,"tmdb":1170608}}}]"#);
         let synced = Trakt.sync(&t.ctx).await.unwrap();

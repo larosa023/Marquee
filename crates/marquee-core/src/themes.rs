@@ -118,9 +118,27 @@ pub fn builtin() -> Vec<Theme> {
         def("midnight", "Midnight", "Deep navy, cool and calm", "dark", "mica", 0.15, ["#0B1020", "#080C19", "#141B31", "#1B2440", "#253052", "#EAF0FF", "#A9B6D6", "#818CB0", "#7AA2FF"], x()),
         def("cinema-red", "Cinema Red", "Velvet curtains and a red carpet", "dark", "mica", 0.12, ["#120809", "#0D0506", "#1F0E10", "#2A1316", "#381A1E", "#FBEDEC", "#D0AEAC", "#9C7C7A", "#FF4D5E"], Extras { glow: 0.7, ..x() }),
         def("slate-light", "Slate Light", "Soft gray, easy in daylight", "light", "mica", 0.15, ["#EEF1F5", "#E3E8EE", "#FAFBFD", "#F2F5F9", "#DCE2EA", "#161C24", "#4C5866", "#5D6873", "#2F6FDB"], Extras { shadow: 0.35, glow: 0.2, ..x() }),
-        def("pure-light", "Pure Light", "Bright white, artwork does the talking", "light", "none", 0.0, ["#FFFFFF", "#F5F5F7", "#FFFFFF", "#F2F2F5", "#E4E4EA", "#111114", "#4E4E58", "#6C6C76", "#B8860B"], Extras { shadow: 0.3, glow: 0.15, ..x() }),
+        def(
+            "pure-light",
+            "Pure Light",
+            "Bright white, artwork does the talking",
+            "light",
+            "none",
+            0.0,
+            ["#FFFFFF", "#F5F5F7", "#FFFFFF", "#F2F2F5", "#E4E4EA", "#111114", "#4E4E58", "#6C6C76", "#B8860B"],
+            Extras { shadow: 0.3, glow: 0.15, ..x() },
+        ),
         def("oled-black", "OLED Black", "True black for OLED screens", "dark", "none", 0.0, ["#000000", "#000000", "#0C0C0E", "#141417", "#1E1E22", "#F5F5F7", "#A8A8B2", "#7F7F88", "#F2C14E"], Extras { shadow: 0.0, blur: 0.0, ..x() }),
-        def("synthwave", "Synthwave", "Neon magenta over midnight purple", "dark", "acrylic", 0.25, ["#140A24", "#0F071C", "#1F1136", "#2A1848", "#38215E", "#F6EBFF", "#C4A9DE", "#9680B2", "#FF5CD6"], Extras { glow: 1.0, motion: 1.15, ..x() }),
+        def(
+            "synthwave",
+            "Synthwave",
+            "Neon magenta over midnight purple",
+            "dark",
+            "acrylic",
+            0.25,
+            ["#140A24", "#0F071C", "#1F1136", "#2A1848", "#38215E", "#F6EBFF", "#C4A9DE", "#9680B2", "#FF5CD6"],
+            Extras { glow: 1.0, motion: 1.15, ..x() },
+        ),
         def("forest", "Forest", "Evergreen and quiet", "dark", "mica", 0.12, ["#0C1410", "#08100C", "#152019", "#1B2A21", "#25382C", "#E9F2EC", "#A9BCAF", "#819286", "#5FD08B"], x()),
         def("system", "Follow Windows", "Light or dark with your Windows accent color", "dark", "mica", 0.18, ["#0A0A0C", "#070709", "#151518", "#1D1D21", "#28282E", "#F6F2EA", "#B9B4AA", "#898680", "windows"], x()),
     ]
@@ -149,7 +167,11 @@ fn luminance(hex: &str) -> Option<f64> {
     let (r, g, b) = parse_hex(hex)?;
     let lin = |c: f64| {
         let c = c / 255.0;
-        if c <= 0.03928 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+        if c <= 0.03928 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
     };
     Some(0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b))
 }
@@ -186,8 +208,14 @@ pub fn validate(v: &Value) -> Result<Theme> {
     t.transparency = t.transparency.clamp(0.0, 0.9);
     t.surface_opacity = t.surface_opacity.clamp(0.02, 1.0);
     for (name, c) in [
-        ("background", &t.colors.background), ("sidebar", &t.colors.sidebar), ("surface", &t.colors.surface), ("surfaceHover", &t.colors.surface_hover),
-        ("surfaceStrong", &t.colors.surface_strong), ("text", &t.colors.text), ("subtext", &t.colors.subtext), ("faint", &t.colors.faint),
+        ("background", &t.colors.background),
+        ("sidebar", &t.colors.sidebar),
+        ("surface", &t.colors.surface),
+        ("surfaceHover", &t.colors.surface_hover),
+        ("surfaceStrong", &t.colors.surface_strong),
+        ("text", &t.colors.text),
+        ("subtext", &t.colors.subtext),
+        ("faint", &t.colors.faint),
     ] {
         if parse_hex(c).is_none() {
             return Err(Error::msg(format!("\"{c}\" isn't a color Marquee can read (for {name}). Use hex like #1A2B3C.")));
@@ -251,7 +279,7 @@ pub fn custom(data_dir: &Path) -> Vec<Theme> {
             }
         }
     }
-    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    out.sort_by_key(|t| t.name.to_lowercase());
     out
 }
 

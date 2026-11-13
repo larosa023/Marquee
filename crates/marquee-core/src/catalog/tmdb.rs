@@ -14,15 +14,43 @@ const BASE: &str = "https://api.themoviedb.org/3";
 const IMG: &str = "https://image.tmdb.org/t/p";
 
 const MOVIE_GENRES: &[(i64, &str)] = &[
-    (28, "Action"), (12, "Adventure"), (16, "Animation"), (35, "Comedy"), (80, "Crime"), (99, "Documentary"),
-    (18, "Drama"), (10751, "Family"), (14, "Fantasy"), (36, "History"), (27, "Horror"), (10402, "Music"),
-    (9648, "Mystery"), (10749, "Romance"), (878, "Science Fiction"), (10770, "TV Movie"), (53, "Thriller"),
-    (10752, "War"), (37, "Western"),
+    (28, "Action"),
+    (12, "Adventure"),
+    (16, "Animation"),
+    (35, "Comedy"),
+    (80, "Crime"),
+    (99, "Documentary"),
+    (18, "Drama"),
+    (10751, "Family"),
+    (14, "Fantasy"),
+    (36, "History"),
+    (27, "Horror"),
+    (10402, "Music"),
+    (9648, "Mystery"),
+    (10749, "Romance"),
+    (878, "Science Fiction"),
+    (10770, "TV Movie"),
+    (53, "Thriller"),
+    (10752, "War"),
+    (37, "Western"),
 ];
 const TV_GENRES: &[(i64, &str)] = &[
-    (10759, "Action & Adventure"), (16, "Animation"), (35, "Comedy"), (80, "Crime"), (99, "Documentary"),
-    (18, "Drama"), (10751, "Family"), (10762, "Kids"), (9648, "Mystery"), (10763, "News"), (10764, "Reality"),
-    (10765, "Sci-Fi & Fantasy"), (10766, "Soap"), (10767, "Talk"), (10768, "War & Politics"), (37, "Western"),
+    (10759, "Action & Adventure"),
+    (16, "Animation"),
+    (35, "Comedy"),
+    (80, "Crime"),
+    (99, "Documentary"),
+    (18, "Drama"),
+    (10751, "Family"),
+    (10762, "Kids"),
+    (9648, "Mystery"),
+    (10763, "News"),
+    (10764, "Reality"),
+    (10765, "Sci-Fi & Fantasy"),
+    (10766, "Soap"),
+    (10767, "Talk"),
+    (10768, "War & Politics"),
+    (37, "Western"),
 ];
 
 pub fn poster(path: &str) -> String {
@@ -44,7 +72,11 @@ async fn get(ctx: &Ctx, path: &str, query: &[(&str, &str)], ttl: i64) -> Result<
 }
 
 fn kind(media: Media) -> &'static str {
-    if media == Media::Tv { "tv" } else { "movie" }
+    if media == Media::Tv {
+        "tv"
+    } else {
+        "movie"
+    }
 }
 
 /// A draft from a list endpoint (discover, trending, search, similar).
@@ -84,7 +116,13 @@ fn stubs(v: &Value, media: Option<Media>) -> Vec<ItemDraft> {
 
 pub async fn trending(ctx: &Ctx, media: Media) -> Result<Vec<ItemDraft>> {
     let v = get(ctx, &format!("/trending/{}/week", kind(media)), &[("language", &ctx.language())], 6 * 3600).await?;
-    Ok(stubs(&v, Some(media)).into_iter().map(|mut d| { d.set("trending", true); d }).collect())
+    Ok(stubs(&v, Some(media))
+        .into_iter()
+        .map(|mut d| {
+            d.set("trending", true);
+            d
+        })
+        .collect())
 }
 
 /// The most-voted titles of all time: familiar faces for the "pick things you love" seeder.
@@ -107,10 +145,7 @@ pub async fn movies_between(ctx: &Ctx, from: &str, to: &str, pages: u32) -> Resu
         let v = get(
             ctx,
             "/discover/movie",
-            &[
-                ("language", &ctx.language()), ("region", &region), ("sort_by", "popularity.desc"), ("include_adult", "false"),
-                ("with_release_type", "2|3|4"), ("release_date.gte", from), ("release_date.lte", to), ("page", &p),
-            ],
+            &[("language", &ctx.language()), ("region", &region), ("sort_by", "popularity.desc"), ("include_adult", "false"), ("with_release_type", "2|3|4"), ("release_date.gte", from), ("release_date.lte", to), ("page", &p)],
             12 * 3600,
         )
         .await?;
@@ -130,10 +165,7 @@ pub async fn shows_premiering(ctx: &Ctx, from: &str, to: &str, pages: u32) -> Re
         let v = get(
             ctx,
             "/discover/tv",
-            &[
-                ("language", &ctx.language()), ("sort_by", "popularity.desc"), ("include_adult", "false"), ("watch_region", &ctx.region()),
-                ("first_air_date.gte", from), ("first_air_date.lte", to), ("page", &p),
-            ],
+            &[("language", &ctx.language()), ("sort_by", "popularity.desc"), ("include_adult", "false"), ("watch_region", &ctx.region()), ("first_air_date.gte", from), ("first_air_date.lte", to), ("page", &p)],
             12 * 3600,
         )
         .await?;
@@ -150,14 +182,11 @@ pub async fn shows_airing(ctx: &Ctx, from: &str, to: &str, pages: u32) -> Result
     let mut out = vec![];
     for page in 1..=pages {
         let p = page.to_string();
-        let v = get(
-            ctx,
-            "/discover/tv",
-            &[("language", &ctx.language()), ("sort_by", "popularity.desc"), ("air_date.gte", from), ("air_date.lte", to), ("page", &p)],
-            12 * 3600,
-        )
-        .await?;
-        out.extend(stubs(&v, Some(Media::Tv)).into_iter().map(|mut d| { d.set("airing", true); d }));
+        let v = get(ctx, "/discover/tv", &[("language", &ctx.language()), ("sort_by", "popularity.desc"), ("air_date.gte", from), ("air_date.lte", to), ("page", &p)], 12 * 3600).await?;
+        out.extend(stubs(&v, Some(Media::Tv)).into_iter().map(|mut d| {
+            d.set("airing", true);
+            d
+        }));
         if page as i64 >= i(&v, "total_pages").unwrap_or(1) {
             break;
         }
@@ -193,9 +222,7 @@ fn providers(v: &Value, region: &str) -> Value {
     if r.is_null() {
         return Value::Null;
     }
-    let group = |key: &str| -> Vec<Value> {
-        arr(r, key).iter().map(|p| json!({ "id": p["provider_id"], "name": p["provider_name"], "logo": s(p, "logo_path").map(|l| small(&l)) })).collect()
-    };
+    let group = |key: &str| -> Vec<Value> { arr(r, key).iter().map(|p| json!({ "id": p["provider_id"], "name": p["provider_name"], "logo": s(p, "logo_path").map(|l| small(&l)) })).collect() };
     let free: Vec<Value> = group("free").into_iter().chain(group("ads")).collect();
     json!({ "link": r["link"], "stream": group("flatrate"), "free": free, "rent": group("rent"), "buy": group("buy") })
 }
@@ -222,11 +249,7 @@ fn credits(v: &Value, d: &mut ItemDraft) {
             }
         }
     }
-    let cast: Vec<Value> = arr(c, "cast")
-        .iter()
-        .take(12)
-        .map(|p| json!({ "id": p["id"], "name": p["name"], "character": p["character"], "photo": s(p, "profile_path").map(|x| small(&x)) }))
-        .collect();
+    let cast: Vec<Value> = arr(c, "cast").iter().take(12).map(|p| json!({ "id": p["id"], "name": p["name"], "character": p["character"], "photo": s(p, "profile_path").map(|x| small(&x)) })).collect();
     for p in arr(c, "cast").iter().take(4) {
         if let Some(name) = s(p, "name") {
             d.creators.push(Creator::new(name, "cast"));
@@ -238,18 +261,8 @@ fn credits(v: &Value, d: &mut ItemDraft) {
 /// Full details for one movie or show.
 pub async fn details(ctx: &Ctx, media: Media, tmdb_id: &str) -> Result<ItemDraft> {
     let region = ctx.region();
-    let extra = if media == Media::Tv {
-        "credits,keywords,videos,watch/providers,external_ids,recommendations,similar,images,content_ratings"
-    } else {
-        "credits,keywords,videos,watch/providers,release_dates,recommendations,similar,images"
-    };
-    let v = get(
-        ctx,
-        &format!("/{}/{tmdb_id}", kind(media)),
-        &[("language", &ctx.language()), ("append_to_response", extra), ("include_image_language", "en,null")],
-        86_400,
-    )
-    .await?;
+    let extra = if media == Media::Tv { "credits,keywords,videos,watch/providers,external_ids,recommendations,similar,images,content_ratings" } else { "credits,keywords,videos,watch/providers,release_dates,recommendations,similar,images" };
+    let v = get(ctx, &format!("/{}/{tmdb_id}", kind(media)), &[("language", &ctx.language()), ("append_to_response", extra), ("include_image_language", "en,null")], 86_400).await?;
     let mut d = stub(&v, media).ok_or_else(|| crate::Error::msg("TMDB returned a title with no name"))?;
     d.detail_level = 1;
     d.genres = names(&v, "genres", "name");

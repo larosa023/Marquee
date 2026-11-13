@@ -250,10 +250,18 @@ pub async fn search_everything(ctx: &Ctx, query: &str, media: Option<Media>, lim
         }
     };
     let games = async {
-        if igdb::configured(ctx) && want(Media::Game) { igdb::search(ctx, q, 10).await } else { Ok(vec![]) }
+        if igdb::configured(ctx) && want(Media::Game) {
+            igdb::search(ctx, q, 10).await
+        } else {
+            Ok(vec![])
+        }
     };
     let music = async {
-        if want(Media::Album) { musicbrainz::search_albums(ctx, q, 10).await } else { Ok(vec![]) }
+        if want(Media::Album) {
+            musicbrainz::search_albums(ctx, q, 10).await
+        } else {
+            Ok(vec![])
+        }
     };
     let (screen, games, music) = futures::join!(screen, games, music);
     let mut offline = false;
@@ -477,7 +485,9 @@ async fn refresh_music(ctx: &Ctx, progress: &(dyn Fn(&str, f64) + Send + Sync)) 
 pub fn where_to_get(item: &Item) -> Value {
     match item.media {
         Media::Movie | Media::Tv => json!({ "providers": item.data["providers"], "tmdb": item.ext("tmdb").map(|id| format!("https://www.themoviedb.org/{}/{id}", if item.media == Media::Tv { "tv" } else { "movie" })) }),
-        Media::Game => json!({ "price": item.data["price"], "discount": item.data["discount"], "low": item.data["low"], "deck": item.data["deck"], "reviews": item.data["reviews"], "store_url": item.data["store_url"], "steam_uri": item.ext("steam").map(|a| format!("steam://store/{a}")), "platforms": item.data["platforms"], "release_dates": item.data["release_dates"] }),
+        Media::Game => {
+            json!({ "price": item.data["price"], "discount": item.data["discount"], "low": item.data["low"], "deck": item.data["deck"], "reviews": item.data["reviews"], "store_url": item.data["store_url"], "steam_uri": item.ext("steam").map(|a| format!("steam://store/{a}")), "platforms": item.data["platforms"], "release_dates": item.data["release_dates"] })
+        }
         Media::Album | Media::Artist => {
             let artist = item.data["artist"].as_str().unwrap_or("");
             let search = format!("https://open.spotify.com/search/{}", urlencoding::encode(&format!("{artist} {}", item.title)));

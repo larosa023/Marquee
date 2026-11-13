@@ -65,10 +65,7 @@ pub fn latest_version() -> u32 {
 pub fn migrate(conn: &mut Connection) -> Result<()> {
     let current = schema_version(conn)?;
     if current > latest_version() {
-        return Err(Error::msg(format!(
-            "This data was made by a newer Marquee (schema {current}; this version knows {}). Update Marquee to open it.",
-            latest_version()
-        )));
+        return Err(Error::msg(format!("This data was made by a newer Marquee (schema {current}; this version knows {}). Update Marquee to open it.", latest_version())));
     }
     for (version, sql) in MIGRATIONS.iter().filter(|m| m.0 > current) {
         let tx = conn.transaction()?;
@@ -123,9 +120,7 @@ mod tests {
         let db = Db::memory().unwrap();
         let conn = db.lock();
         for table in ["items", "sources", "user_events", "lists", "list_items", "follows", "notifications", "cache", "settings"] {
-            let n: i64 = conn
-                .query_row("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = ?1", [table], |r| r.get(0))
-                .unwrap();
+            let n: i64 = conn.query_row("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = ?1", [table], |r| r.get(0)).unwrap();
             assert_eq!(n, 1, "missing table {table}");
         }
     }

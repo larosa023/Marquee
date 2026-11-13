@@ -82,7 +82,11 @@ pub async fn status(ctx: &Ctx) -> AiStatus {
     for m in arr(&v, "models") {
         let Some(name) = crate::util::s(m, "name") else { continue };
         let embedding = is_embedding_model(&name, &m["details"]);
-        if embedding { embed.push(name.clone()) } else { chat.push(name.clone()) }
+        if embedding {
+            embed.push(name.clone())
+        } else {
+            chat.push(name.clone())
+        }
         st.models.push(json!({ "name": name, "size": m["size"], "params": m["details"]["parameter_size"], "embedding": embedding }));
     }
     st.chat_model = if chat.contains(&s.chat_model) { Some(s.chat_model.clone()) } else { chat.first().cloned() };
@@ -145,7 +149,11 @@ pub fn cosine(a: &[f32], b: &[f32]) -> f64 {
         na += (*x as f64).powi(2);
         nb += (*y as f64).powi(2);
     }
-    if na == 0.0 || nb == 0.0 { 0.0 } else { dot / (na.sqrt() * nb.sqrt()) }
+    if na == 0.0 || nb == 0.0 {
+        0.0
+    } else {
+        dot / (na.sqrt() * nb.sqrt())
+    }
 }
 
 /// Embeds titles that don't have a vector yet (a bounded batch per call).
@@ -218,12 +226,8 @@ pub async fn blurb(ctx: &Ctx, title: &str, media: &str, overview: &str, reasons:
     let (base, st) = ready(ctx).await?;
     let model = st.chat_model?;
     let system = "You write two warm, specific sentences telling one person why they might enjoy a title. Use only the facts given. No spoilers, no hype words, no lists, no quotation marks. Address them as \"you\".";
-    let prompt = format!(
-        "Title: {title} ({media})\nWhat it is: {}\nWhy the recommender picked it: {}\nThings this person loves: {}\n\nWrite the two sentences.",
-        truncate(overview, 500),
-        reasons.join("; ").replace('*', ""),
-        liked.join(", ")
-    );
+    let prompt =
+        format!("Title: {title} ({media})\nWhat it is: {}\nWhy the recommender picked it: {}\nThings this person loves: {}\n\nWrite the two sentences.", truncate(overview, 500), reasons.join("; ").replace('*', ""), liked.join(", "));
     let text = generate(ctx, &base, &model, system, &prompt, false).await.ok()?;
     let text = text.trim().trim_matches('"').to_string();
     (!text.is_empty()).then_some(text)
@@ -248,9 +252,13 @@ mod tests {
     #[tokio::test]
     async fn status_detects_models_and_picks_defaults() {
         let t = ctx();
-        t.net.on("localhost:11434/api/tags", 200, r#"{"models":[
+        t.net.on(
+            "localhost:11434/api/tags",
+            200,
+            r#"{"models":[
             {"name":"llama3.2:3b","size":2019393189,"details":{"family":"llama","parameter_size":"3.2B"}},
-            {"name":"nomic-embed-text:latest","size":274302450,"details":{"family":"nomic-bert","parameter_size":"137M"}}]}"#);
+            {"name":"nomic-embed-text:latest","size":274302450,"details":{"family":"nomic-bert","parameter_size":"137M"}}]}"#,
+        );
         let st = status(&t.ctx).await;
         assert!(st.running);
         assert_eq!(st.chat_model.as_deref(), Some("llama3.2:3b"));

@@ -20,12 +20,7 @@ use std::io::Read;
 
 pub struct Letterboxd;
 
-pub const EXPORT_STEPS: &[&str] = &[
-    "Open letterboxd.com and sign in.",
-    "Go to Settings → Data.",
-    "Click \"Export your data\" and confirm. A zip file downloads.",
-    "Drop that zip here (no need to unpack it).",
-];
+pub const EXPORT_STEPS: &[&str] = &["Open letterboxd.com and sign in.", "Go to Settings → Data.", "Click \"Export your data\" and confirm. A zip file downloads.", "Drop that zip here (no need to unpack it)."];
 
 fn valid_username(u: &str) -> bool {
     !u.is_empty() && u.len() <= 40 && u.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')

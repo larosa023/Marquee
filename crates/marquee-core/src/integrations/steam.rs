@@ -124,13 +124,8 @@ impl Source for Steam {
         let steamid = s(&cfg(ctx, "steam"), "steamid").ok_or_else(|| Error::Reauth("Steam".into()))?;
         let mut out = Synced::default();
 
-        let owned: Value = ctx
-            .http
-            .get("Steam", format!("{API}/IPlayerService/GetOwnedGames/v1/"))
-            .query(&[("key", &key), ("steamid", &steamid), ("include_appinfo", "1"), ("include_played_free_games", "1")])
-            .json()
-            .await
-            .map_err(|e| match e {
+        let owned: Value =
+            ctx.http.get("Steam", format!("{API}/IPlayerService/GetOwnedGames/v1/")).query(&[("key", &key), ("steamid", &steamid), ("include_appinfo", "1"), ("include_played_free_games", "1")]).json().await.map_err(|e| match e {
                 Error::Api { status: 401 | 403, .. } => Error::NotConfigured("Steam rejected the Web API key. Check it in Settings → Connections → API keys.".into()),
                 other => other,
             })?;

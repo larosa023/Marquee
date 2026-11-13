@@ -148,7 +148,11 @@ pub fn auto_if_due(ctx: &Ctx) -> Result<Option<PathBuf>> {
         Some(l) => (chrono::Utc::now() - l.with_timezone(&chrono::Utc)).num_days() >= s.every_days.max(1),
         None => true,
     };
-    if due { create(ctx, None, true).map(Some) } else { Ok(None) }
+    if due {
+        create(ctx, None, true).map(Some)
+    } else {
+        Ok(None)
+    }
 }
 
 fn read_entry(zip: &mut zip::ZipArchive<std::fs::File>, name: &str) -> Result<Vec<u8>> {

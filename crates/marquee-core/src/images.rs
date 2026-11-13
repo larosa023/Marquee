@@ -14,10 +14,7 @@ use std::path::PathBuf;
 
 pub const DEFAULT_CAP_MB: u64 = 1024;
 
-const HOSTS: &[&str] = &[
-    "image.tmdb.org", "images.igdb.com", "coverartarchive.org", "archive.org", "steamstatic.com", "steampowered.com", "akamaihd.net",
-    "scdn.co", "spotifycdn.com", "fastly.net", "last.fm", "ytimg.com", "ltrbxd.com",
-];
+const HOSTS: &[&str] = &["image.tmdb.org", "images.igdb.com", "coverartarchive.org", "archive.org", "steamstatic.com", "steampowered.com", "akamaihd.net", "scdn.co", "spotifycdn.com", "fastly.net", "last.fm", "ytimg.com", "ltrbxd.com"];
 
 pub fn allowed(url: &str) -> bool {
     let Ok(u) = url::Url::parse(url) else { return false };
@@ -76,10 +73,7 @@ pub async fn get(ctx: &Ctx, url: &str) -> Result<(Vec<u8>, String)> {
         tokio::fs::create_dir_all(dir).await?;
     }
     tokio::fs::write(&file, &resp.body).await?;
-    ctx.db.lock().execute(
-        "INSERT OR REPLACE INTO image_cache (key, bytes, mime, last_access) VALUES (?1, ?2, ?3, ?4)",
-        params![k, resp.body.len() as i64, mime, now()],
-    )?;
+    ctx.db.lock().execute("INSERT OR REPLACE INTO image_cache (key, bytes, mime, last_access) VALUES (?1, ?2, ?3, ?4)", params![k, resp.body.len() as i64, mime, now()])?;
     evict(ctx, cap_bytes(ctx))?;
     Ok((resp.body, mime))
 }
@@ -133,7 +127,7 @@ mod tests {
 
     fn jpeg(extra: usize) -> Vec<u8> {
         let mut v = vec![0xFF, 0xD8, 0xFF, 0xE0];
-        v.extend(std::iter::repeat(7u8).take(extra));
+        v.extend(std::iter::repeat_n(7u8, extra));
         v
     }
 

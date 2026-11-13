@@ -47,13 +47,7 @@ pub fn parse_store_date(text: &str) -> Option<String> {
 /// Store details for one app. Returns `None` for delisted or region-locked apps.
 pub async fn app_details(ctx: &Ctx, appid: &str) -> Result<Option<ItemDraft>> {
     let cc = ctx.region().to_lowercase();
-    let v: Value = ctx
-        .http
-        .get("Steam store", "https://store.steampowered.com/api/appdetails")
-        .query(&[("appids", appid), ("cc", &cc), ("l", "english")])
-        .ttl(6 * 3600)
-        .json()
-        .await?;
+    let v: Value = ctx.http.get("Steam store", "https://store.steampowered.com/api/appdetails").query(&[("appids", appid), ("cc", &cc), ("l", "english")]).ttl(6 * 3600).json().await?;
     let entry = &v[appid];
     if entry["success"] != true {
         return Ok(None);
@@ -112,13 +106,7 @@ pub async fn app_details(ctx: &Ctx, appid: &str) -> Result<Option<ItemDraft>> {
 
 /// "verified" | "playable" | "unsupported" | "unknown".
 pub async fn deck_status(ctx: &Ctx, appid: &str) -> Result<&'static str> {
-    let v: Value = ctx
-        .http
-        .get("Steam store", "https://store.steampowered.com/saleaction/ajaxgetdeckappcompatibilityreport")
-        .query(&[("nAppID", appid), ("l", "english")])
-        .ttl(7 * 86_400)
-        .json()
-        .await?;
+    let v: Value = ctx.http.get("Steam store", "https://store.steampowered.com/saleaction/ajaxgetdeckappcompatibilityreport").query(&[("nAppID", appid), ("l", "english")]).ttl(7 * 86_400).json().await?;
     Ok(match i(&v["results"], "resolved_category") {
         Some(3) => "verified",
         Some(2) => "playable",
@@ -129,13 +117,7 @@ pub async fn deck_status(ctx: &Ctx, appid: &str) -> Result<&'static str> {
 
 /// Review summary: ("Very Positive", percent positive, total reviews).
 pub async fn reviews(ctx: &Ctx, appid: &str) -> Result<Option<Value>> {
-    let v: Value = ctx
-        .http
-        .get("Steam store", format!("https://store.steampowered.com/appreviews/{appid}"))
-        .query(&[("json", "1"), ("num_per_page", "0"), ("language", "all"), ("purchase_type", "all")])
-        .ttl(86_400)
-        .json()
-        .await?;
+    let v: Value = ctx.http.get("Steam store", format!("https://store.steampowered.com/appreviews/{appid}")).query(&[("json", "1"), ("num_per_page", "0"), ("language", "all"), ("purchase_type", "all")]).ttl(86_400).json().await?;
     let q = &v["query_summary"];
     let total = i(q, "total_reviews").unwrap_or(0);
     if total == 0 {
@@ -150,14 +132,7 @@ pub async fn itad_low(ctx: &Ctx, appid: &str) -> Result<Option<Value>> {
     let Some(key) = ctx.key("itad") else { return Ok(None) };
     let found: Value = ctx.http.get("IsThereAnyDeal", "https://api.isthereanydeal.com/games/lookup/v1").query(&[("key", &key), ("appid", appid)]).ttl(30 * 86_400).json().await?;
     let Some(id) = s(&found["game"], "id") else { return Ok(None) };
-    let lows: Value = ctx
-        .http
-        .post("IsThereAnyDeal", "https://api.isthereanydeal.com/games/historylow/v1")
-        .query(&[("key", &key), ("country", &ctx.region())])
-        .json_body(&json!([id]))
-        .ttl(86_400)
-        .json()
-        .await?;
+    let lows: Value = ctx.http.post("IsThereAnyDeal", "https://api.isthereanydeal.com/games/historylow/v1").query(&[("key", &key), ("country", &ctx.region())]).json_body(&json!([id])).ttl(86_400).json().await?;
     let low = &lows[0]["low"];
     if low.is_null() {
         return Ok(None);
@@ -174,10 +149,7 @@ pub async fn itad_low(ctx: &Ctx, appid: &str) -> Result<Option<Value>> {
 
 /// Records today's price and returns the lowest price Marquee has seen for this game.
 pub fn track_price(conn: &rusqlite::Connection, item_id: i64, cents: i64, discount: i64, currency: &str) -> Result<Value> {
-    conn.execute(
-        "INSERT OR REPLACE INTO price_history (item_id, at, cents, discount, currency) VALUES (?1, ?2, ?3, ?4, ?5)",
-        rusqlite::params![item_id, today(), cents, discount, currency],
-    )?;
+    conn.execute("INSERT OR REPLACE INTO price_history (item_id, at, cents, discount, currency) VALUES (?1, ?2, ?3, ?4, ?5)", rusqlite::params![item_id, today(), cents, discount, currency])?;
     let (low, at): (i64, String) = conn.query_row("SELECT cents, at FROM price_history WHERE item_id = ?1 ORDER BY cents, at LIMIT 1", [item_id], |r| Ok((r.get(0)?, r.get(1)?)))?;
     Ok(json!({ "cents": low, "currency": currency, "at": at, "source": "Marquee" }))
 }

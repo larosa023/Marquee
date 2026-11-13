@@ -91,7 +91,10 @@ pub struct BootState {
 pub enum Boot {
     Normal,
     /// This version keeps failing: run this installer to go back.
-    RollBack { to_version: String, installer: PathBuf },
+    RollBack {
+        to_version: String,
+        installer: PathBuf,
+    },
 }
 
 fn file(data_dir: &Path) -> PathBuf {

@@ -98,23 +98,23 @@ impl Transport for ReqwestTransport {
 /// service's published limit.
 fn limit_for(host: &str) -> (f64, f64) {
     match host {
-        "api.themoviedb.org" => (20.0, 20.0),          // ~50 rps allowed
-        "api.igdb.com" => (3.5, 4.0),                  // 4 rps
+        "api.themoviedb.org" => (20.0, 20.0), // ~50 rps allowed
+        "api.igdb.com" => (3.5, 4.0),         // 4 rps
         "id.twitch.tv" => (1.0, 2.0),
-        "musicbrainz.org" => (0.9, 1.0),               // 1 rps, strictly
+        "musicbrainz.org" => (0.9, 1.0), // 1 rps, strictly
         "coverartarchive.org" => (6.0, 12.0),
-        "ws.audioscrobbler.com" => (4.0, 5.0),         // ~5 rps
-        "api.spotify.com" => (4.0, 8.0),               // rolling 30 s window, undisclosed
+        "ws.audioscrobbler.com" => (4.0, 5.0), // ~5 rps
+        "api.spotify.com" => (4.0, 8.0),       // rolling 30 s window, undisclosed
         "accounts.spotify.com" => (1.0, 2.0),
-        "api.trakt.tv" => (3.0, 6.0),                  // 1000 per 5 min
-        "api.steampowered.com" => (2.0, 4.0),          // 100k per day
-        "store.steampowered.com" => (0.6, 3.0),        // ~200 per 5 min
+        "api.trakt.tv" => (3.0, 6.0),           // 1000 per 5 min
+        "api.steampowered.com" => (2.0, 4.0),   // 100k per day
+        "store.steampowered.com" => (0.6, 3.0), // ~200 per 5 min
         "letterboxd.com" => (0.5, 2.0),
         // Artwork CDNs: a screen of posters loads at once.
         "image.tmdb.org" | "images.igdb.com" | "i.scdn.co" | "lastfm.freetls.fastly.net" | "i.ytimg.com" => (40.0, 60.0),
         h if h.ends_with("steamstatic.com") => (40.0, 60.0),
         "archive.org" => (6.0, 12.0),
-        "localhost" | "127.0.0.1" => (50.0, 50.0),     // Ollama
+        "localhost" | "127.0.0.1" => (50.0, 50.0), // Ollama
         _ => (4.0, 6.0),
     }
 }
@@ -208,10 +208,7 @@ impl Http {
 
     fn cache_get(&self, key: &str) -> Option<(Vec<u8>, Option<String>, bool)> {
         let conn = self.inner.db.lock();
-        conn.query_row("SELECT body, etag, expires_at > ?2 FROM cache WHERE key = ?1", params![key, now()], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
-            .optional()
-            .ok()
-            .flatten()
+        conn.query_row("SELECT body, etag, expires_at > ?2 FROM cache WHERE key = ?1", params![key, now()], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional().ok().flatten()
     }
 
     fn cache_put(&self, key: &str, body: &[u8], etag: Option<&str>, ttl: i64) {
@@ -325,7 +322,11 @@ impl<'a> Call<'a> {
         let detail = {
             let t = resp.text();
             let t = t.trim();
-            if t.len() > 300 { format!("{}…", &t[..t.char_indices().nth(300).map(|c| c.0).unwrap_or(t.len())]) } else { t.to_string() }
+            if t.len() > 300 {
+                format!("{}…", &t[..t.char_indices().nth(300).map(|c| c.0).unwrap_or(t.len())])
+            } else {
+                t.to_string()
+            }
         };
         match resp.status {
             401 => Err(Error::Reauth(service.to_string())),
@@ -407,9 +408,12 @@ impl<'a> Call<'a> {
 pub mod testing {
     use super::*;
 
+    /// A canned answer: what the URL must contain, then status, headers and body.
+    type Route = (String, u16, Vec<(String, String)>, Vec<u8>);
+
     #[derive(Default)]
     pub struct FixtureTransport {
-        routes: Mutex<Vec<(String, u16, Vec<(String, String)>, Vec<u8>)>>,
+        routes: Mutex<Vec<Route>>,
         pub log: Mutex<Vec<HttpRequest>>,
         pub offline: Mutex<bool>,
     }

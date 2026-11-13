@@ -37,15 +37,7 @@ pub fn redirect_uri() -> String {
 pub struct Spotify;
 
 pub fn authorize_url(client_id: &str, challenge: &str, state: &str) -> String {
-    let params = [
-        ("client_id", client_id),
-        ("response_type", "code"),
-        ("redirect_uri", &redirect_uri()),
-        ("code_challenge_method", "S256"),
-        ("code_challenge", challenge),
-        ("state", state),
-        ("scope", SCOPES),
-    ];
+    let params = [("client_id", client_id), ("response_type", "code"), ("redirect_uri", &redirect_uri()), ("code_challenge_method", "S256"), ("code_challenge", challenge), ("state", state), ("scope", SCOPES)];
     format!("{ACCOUNTS}/authorize?{}", params.iter().map(|(k, v)| format!("{k}={}", urlencoding::encode(v))).collect::<Vec<_>>().join("&"))
 }
 
@@ -75,10 +67,7 @@ pub async fn finish_connect(ctx: &Ctx, params: &HashMap<String, String>, verifie
         .json()
         .await
         .map_err(|e| match e {
-            Error::Api { status: 400, detail, .. } if detail.contains("redirect") => Error::NotConfigured(format!(
-                "Spotify rejected the redirect address. In your Spotify app's settings, add exactly {} as a Redirect URI.",
-                redirect_uri()
-            )),
+            Error::Api { status: 400, detail, .. } if detail.contains("redirect") => Error::NotConfigured(format!("Spotify rejected the redirect address. In your Spotify app's settings, add exactly {} as a Redirect URI.", redirect_uri())),
             other => other,
         })?;
     save_tokens(ctx, &v)?;
@@ -107,17 +96,11 @@ async fn token(ctx: &Ctx) -> Result<String> {
     }
     let refresh = ctx.secrets.get("spotify.refresh").ok_or_else(|| Error::Reauth("Spotify".into()))?;
     let client_id = ctx.require_key("spotify_client_id")?;
-    let v: Value = ctx
-        .http
-        .post("Spotify", format!("{ACCOUNTS}/api/token"))
-        .form(&[("grant_type", "refresh_token"), ("refresh_token", &refresh), ("client_id", &client_id)])
-        .json()
-        .await
-        .map_err(|e| match e {
-            // invalid_grant: revoked, or past the six-month refresh-token lifetime.
-            Error::Api { status: 400 | 401, .. } => Error::Reauth("Spotify".into()),
-            other => other,
-        })?;
+    let v: Value = ctx.http.post("Spotify", format!("{ACCOUNTS}/api/token")).form(&[("grant_type", "refresh_token"), ("refresh_token", &refresh), ("client_id", &client_id)]).json().await.map_err(|e| match e {
+        // invalid_grant: revoked, or past the six-month refresh-token lifetime.
+        Error::Api { status: 400 | 401, .. } => Error::Reauth("Spotify".into()),
+        other => other,
+    })?;
     save_tokens(ctx, &v)?;
     s(&v, "access_token").ok_or_else(|| Error::Reauth("Spotify".into()))
 }
@@ -492,7 +475,11 @@ mod tests {
         let t = signed_in();
         t.net.on("/me/top/artists", 200, include_str!("../../tests/fixtures/spotify_top_artists.json"));
         t.net.on("/me/top/tracks", 200, include_str!("../../tests/fixtures/spotify_top_tracks.json"));
-        t.net.on("/me/albums", 200, r#"{"items":[{"added_at":"2025-05-01T00:00:00Z","album":{"id":"al2","name":"Dive","album_type":"album","release_date":"2011-11-08","artists":[{"name":"Tycho"}],"images":[{"url":"https://i/d.jpg","width":640}]}}],"next":null}"#);
+        t.net.on(
+            "/me/albums",
+            200,
+            r#"{"items":[{"added_at":"2025-05-01T00:00:00Z","album":{"id":"al2","name":"Dive","album_type":"album","release_date":"2011-11-08","artists":[{"name":"Tycho"}],"images":[{"url":"https://i/d.jpg","width":640}]}}],"next":null}"#,
+        );
         let synced = Spotify.sync(&t.ctx).await.unwrap();
         let artist = synced.events.iter().find(|e| e.draft.media() == Media::Artist && e.kind == EventKind::Play).unwrap();
         assert_eq!(artist.draft.title, "Tycho");

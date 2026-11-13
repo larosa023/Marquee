@@ -13,10 +13,21 @@ pub trait SecretStore: Send + Sync {
 
 /// Every secret Marquee can store. "Delete all my data" walks this list.
 pub const SECRET_KEYS: &[&str] = &[
-    "trakt.access", "trakt.refresh", "spotify.access", "spotify.refresh", "lastfm.session",
-    "key.tmdb", "key.igdb_client_id", "key.igdb_client_secret", "key.spotify_client_id",
-    "key.trakt_client_id", "key.trakt_client_secret", "key.lastfm_key", "key.lastfm_secret",
-    "key.steam", "key.itad",
+    "trakt.access",
+    "trakt.refresh",
+    "spotify.access",
+    "spotify.refresh",
+    "lastfm.session",
+    "key.tmdb",
+    "key.igdb_client_id",
+    "key.igdb_client_secret",
+    "key.spotify_client_id",
+    "key.trakt_client_id",
+    "key.trakt_client_secret",
+    "key.lastfm_key",
+    "key.lastfm_secret",
+    "key.steam",
+    "key.itad",
 ];
 
 /// In-memory store for tests and for running the engine outside the app.

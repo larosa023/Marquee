@@ -154,7 +154,11 @@ pub fn restored_message(summary: &str) -> Value {
 }
 
 pub fn busy_message(busy: bool, reason: &str) -> Value {
-    if busy { json!({ "type": "busy", "app": APP_ID, "reason": reason }) } else { json!({ "type": "idle", "app": APP_ID }) }
+    if busy {
+        json!({ "type": "busy", "app": APP_ID, "reason": reason })
+    } else {
+        json!({ "type": "idle", "app": APP_ID })
+    }
 }
 
 /// Reads and removes the state saved before a live update (`--restore-state <file>`).

@@ -38,16 +38,10 @@ async fn token(ctx: &Ctx) -> Result<String> {
     }
     let id = ctx.require_key("igdb_client_id")?;
     let secret = ctx.require_key("igdb_client_secret")?;
-    let v: Value = ctx
-        .http
-        .post("Twitch", "https://id.twitch.tv/oauth2/token")
-        .form(&[("client_id", &id), ("client_secret", &secret), ("grant_type", "client_credentials")])
-        .json()
-        .await
-        .map_err(|e| match e {
-            Error::Api { status: 400 | 403, .. } => Error::NotConfigured("Twitch rejected the IGDB client ID or secret. Check them in Settings → Connections → API keys.".into()),
-            other => other,
-        })?;
+    let v: Value = ctx.http.post("Twitch", "https://id.twitch.tv/oauth2/token").form(&[("client_id", &id), ("client_secret", &secret), ("grant_type", "client_credentials")]).json().await.map_err(|e| match e {
+        Error::Api { status: 400 | 403, .. } => Error::NotConfigured("Twitch rejected the IGDB client ID or secret. Check them in Settings → Connections → API keys.".into()),
+        other => other,
+    })?;
     let t = s(&v, "access_token").ok_or_else(|| Error::msg("Twitch didn't return an access token"))?;
     ctx.scratch_set("twitch.token", &t, i(&v, "expires_in").unwrap_or(3600).saturating_sub(300));
     Ok(t)
@@ -56,15 +50,7 @@ async fn token(ctx: &Ctx) -> Result<String> {
 async fn query(ctx: &Ctx, endpoint: &str, body: String, ttl: i64) -> Result<Vec<Value>> {
     let t = token(ctx).await?;
     let id = ctx.require_key("igdb_client_id")?;
-    ctx.http
-        .post("IGDB", format!("https://api.igdb.com/v4/{endpoint}"))
-        .header("Client-ID", id)
-        .bearer(&t)
-        .header("Accept", "application/json")
-        .text_body(body)
-        .ttl(ttl)
-        .json()
-        .await
+    ctx.http.post("IGDB", format!("https://api.igdb.com/v4/{endpoint}")).header("Client-ID", id).bearer(&t).header("Accept", "application/json").text_body(body).ttl(ttl).json().await
 }
 
 /// Finds a Steam app id in IGDB's store links.
@@ -74,11 +60,7 @@ fn steam_appid(v: &Value) -> Option<String> {
         let id: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
         (!id.is_empty()).then_some(id)
     };
-    arr(v, "external_games")
-        .iter()
-        .filter_map(|e| e["url"].as_str())
-        .chain(arr(v, "websites").iter().filter_map(|w| w["url"].as_str()))
-        .find_map(from_url)
+    arr(v, "external_games").iter().filter_map(|e| e["url"].as_str()).chain(arr(v, "websites").iter().filter_map(|w| w["url"].as_str())).find_map(from_url)
 }
 
 pub fn draft(v: &Value, detail: bool) -> Option<ItemDraft> {
@@ -123,10 +105,7 @@ pub fn draft(v: &Value, detail: bool) -> Option<ItemDraft> {
         }
         let gallery: Vec<String> = arr(v, "screenshots").iter().chain(arr(v, "artworks")).filter_map(|x| s(x, "image_id")).take(10).map(|x| image(&x, "screenshot_big")).collect();
         d.set("gallery", gallery);
-        let mut dates: Vec<Value> = arr(v, "release_dates")
-            .iter()
-            .filter_map(|r| Some(json!({ "platform": s(&r["platform"], "abbreviation")?, "date": i(r, "date").and_then(unix_to_date), "human": r["human"] })))
-            .collect();
+        let mut dates: Vec<Value> = arr(v, "release_dates").iter().filter_map(|r| Some(json!({ "platform": s(&r["platform"], "abbreviation")?, "date": i(r, "date").and_then(unix_to_date), "human": r["human"] }))).collect();
         dates.sort_by(|a, b| a["date"].as_str().cmp(&b["date"].as_str()));
         dates.dedup_by(|a, b| a["platform"] == b["platform"]);
         d.set("release_dates", dates);
@@ -137,9 +116,7 @@ pub fn draft(v: &Value, detail: bool) -> Option<ItemDraft> {
 
 /// Games releasing between two dates, most anticipated first.
 pub async fn games_between(ctx: &Ctx, from_ts: i64, to_ts: i64, limit: u32) -> Result<Vec<ItemDraft>> {
-    let body = format!(
-        "fields {LIST_FIELDS}; where first_release_date >= {from_ts} & first_release_date <= {to_ts} & version_parent = null & parent_game = null & cover != null; sort hypes desc; limit {limit};"
-    );
+    let body = format!("fields {LIST_FIELDS}; where first_release_date >= {from_ts} & first_release_date <= {to_ts} & version_parent = null & parent_game = null & cover != null; sort hypes desc; limit {limit};");
     Ok(query(ctx, "games", body, 12 * 3600).await?.iter().filter_map(|v| draft(v, false)).collect())
 }
 

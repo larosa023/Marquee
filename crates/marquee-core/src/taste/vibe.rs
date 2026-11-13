@@ -119,12 +119,7 @@ pub struct VibeResult {
 async fn reference_features(ctx: &Ctx, title: &str) -> Vec<(String, f64)> {
     let local = {
         let conn = ctx.db.lock();
-        conn.query_row(
-            "SELECT id FROM items WHERE sort_title = ?1 AND media != 'artist' ORDER BY detail_level DESC, popularity DESC LIMIT 1",
-            [sort_title(title)],
-            |r| r.get::<_, i64>(0),
-        )
-        .ok()
+        conn.query_row("SELECT id FROM items WHERE sort_title = ?1 AND media != 'artist' ORDER BY detail_level DESC, popularity DESC LIMIT 1", [sort_title(title)], |r| r.get::<_, i64>(0)).ok()
     };
     let id = match local {
         Some(id) => Some(id),
@@ -278,11 +273,7 @@ mod tests {
         let t = ctx();
         let (cozy, _, _) = seed(&t);
         t.net.on("localhost:11434/api/tags", 200, r#"{"models":[{"name":"llama3.2:3b","details":{"family":"llama"}}]}"#);
-        t.net.on(
-            "localhost:11434/api/generate",
-            200,
-            r#"{"response":"{\"media\":[\"game\"],\"tags\":[\"cozy\",\"relaxing\",\"not-a-real-tag\"],\"genres\":[\"simulation\"],\"short\":true,\"like\":[]}","done":true}"#,
-        );
+        t.net.on("localhost:11434/api/generate", 200, r#"{"response":"{\"media\":[\"game\"],\"tags\":[\"cozy\",\"relaxing\",\"not-a-real-tag\"],\"genres\":[\"simulation\"],\"short\":true,\"like\":[]}","done":true}"#);
         let r = search(&t.ctx, "something gentle to unwind with after work", 10).await.unwrap();
         assert_eq!(r.engine, "ollama");
         assert_eq!(r.cards[0].id, cozy);

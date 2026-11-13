@@ -47,12 +47,8 @@ pub fn apply(ctx: &Ctx, source: &str, synced: &Synced) -> Result<usize> {
     }
     if is_full_state(source) && !synced.events.is_empty() {
         let mut stmt = tx.prepare("SELECT id, item_id, kind FROM user_events WHERE source = ?1")?;
-        let stale: Vec<i64> = stmt
-            .query_map([source], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, String>(2)?)))?
-            .filter_map(|r| r.ok())
-            .filter(|(_, item, kind)| !seen.iter().any(|(i, k)| i == item && k == kind))
-            .map(|r| r.0)
-            .collect();
+        let stale: Vec<i64> =
+            stmt.query_map([source], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, String>(2)?)))?.filter_map(|r| r.ok()).filter(|(_, item, kind)| !seen.iter().any(|(i, k)| i == item && k == kind)).map(|r| r.0).collect();
         drop(stmt);
         for id in stale {
             tx.execute("DELETE FROM user_events WHERE id = ?1", [id])?;
@@ -124,10 +120,14 @@ fn source_for_target(target: &str) -> Option<(&'static str, String)> {
 pub enum Pushed {
     Synced,
     /// The service has no write API; the right page was opened for the user.
-    Opened { hint: String },
+    Opened {
+        hint: String,
+    },
     /// Offline: saved and will be sent when the connection is back.
     Queued,
-    Failed { message: String },
+    Failed {
+        message: String,
+    },
 }
 
 impl Pushed {
@@ -151,7 +151,11 @@ pub async fn push(ctx: &Ctx, source: &str, op: &WriteOp) -> Pushed {
         Ok(WriteOutcome::Opened { hint, .. }) => Pushed::Opened { hint },
         Err(e) if e.is_offline() => {
             let queued = serde_json::to_string(op).ok().and_then(|json| ctx.db.lock().execute("INSERT INTO pending_writes (source, op, created_at) VALUES (?1, ?2, ?3)", rusqlite::params![source, json, now()]).ok());
-            if queued.is_some() { Pushed::Queued } else { Pushed::Failed { message: e.to_string() } }
+            if queued.is_some() {
+                Pushed::Queued
+            } else {
+                Pushed::Failed { message: e.to_string() }
+            }
         }
         Err(e) => {
             if matches!(e, Error::Reauth(_)) {
@@ -244,10 +248,7 @@ pub async fn add_to(ctx: &Ctx, item_id: i64, target: &str) -> Result<Value> {
 pub async fn remove_from(ctx: &Ctx, item_id: i64, list_id: i64) -> Result<Value> {
     let (mirror, state): (Option<String>, Option<String>) = {
         let conn = ctx.db.lock();
-        (
-            conn.query_row("SELECT mirror FROM lists WHERE id = ?1", [list_id], |r| r.get(0)).unwrap_or(None),
-            conn.query_row("SELECT sync_state FROM list_items WHERE list_id = ?1 AND item_id = ?2", [list_id, item_id], |r| r.get(0)).ok(),
-        )
+        (conn.query_row("SELECT mirror FROM lists WHERE id = ?1", [list_id], |r| r.get(0)).unwrap_or(None), conn.query_row("SELECT sync_state FROM list_items WHERE list_id = ?1 AND item_id = ?2", [list_id, item_id], |r| r.get(0)).ok())
     };
     let pushed = match (mirror.as_deref().and_then(source_for_target), state.as_deref()) {
         // Only items that made it to the service need removing there.
@@ -400,21 +401,17 @@ async fn refresh_tracked(ctx: &Ctx) -> Result<()> {
             let rows = stmt.query_map([&now], |r| r.get(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
             Ok(rows)
         };
-        let shows = ids(
-            "SELECT i.id FROM items i WHERE i.media = 'tv' AND (i.expires_at IS NULL OR i.expires_at < ?1 OR i.detail_level = 0)
+        let shows = ids("SELECT i.id FROM items i WHERE i.media = 'tv' AND (i.expires_at IS NULL OR i.expires_at < ?1 OR i.detail_level = 0)
                AND (EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind != 'dismiss')
                  OR EXISTS (SELECT 1 FROM list_items l WHERE l.item_id = i.id)
                  OR EXISTS (SELECT 1 FROM follows f WHERE f.item_id = i.id))
-             ORDER BY i.popularity DESC LIMIT 80",
-        )?;
-        let games = ids(
-            "SELECT i.id FROM items i WHERE i.media = 'game' AND (i.expires_at IS NULL OR i.expires_at < ?1 OR i.detail_level = 0)
+             ORDER BY i.popularity DESC LIMIT 80")?;
+        let games = ids("SELECT i.id FROM items i WHERE i.media = 'game' AND (i.expires_at IS NULL OR i.expires_at < ?1 OR i.detail_level = 0)
                AND EXISTS (SELECT 1 FROM item_ids x WHERE x.item_id = i.id AND x.source = 'steam')
                AND (EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind = 'wishlist')
                  OR EXISTS (SELECT 1 FROM list_items l WHERE l.item_id = i.id)
                  OR EXISTS (SELECT 1 FROM follows f WHERE f.item_id = i.id))
-             LIMIT 40",
-        )?;
+             LIMIT 40")?;
         let mut stmt = conn.prepare("SELECT ref FROM follows WHERE kind = 'franchise'")?;
         let franchises = stmt.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
         (shows, games, franchises)
@@ -672,10 +669,11 @@ mod tests {
         let id = store::upsert_item(&t.ctx.db.lock(), &ItemDraft::new(Media::Game, "Hades").id("steam", 1)).unwrap();
         let out = rate(&t.ctx, id, 4.3).await.unwrap();
         assert_eq!(out["stars"], 4.5);
-        let conn = t.ctx.db.lock();
-        assert_eq!(store::user_rating(&conn, id), Some(4.5));
-        assert!(store::has_event(&conn, id, &["watched"]));
-        drop(conn);
+        {
+            let conn = t.ctx.db.lock();
+            assert_eq!(store::user_rating(&conn, id), Some(4.5));
+            assert!(store::has_event(&conn, id, &["watched"]));
+        }
         rate(&t.ctx, id, 0.0).await.unwrap();
         assert_eq!(store::user_rating(&t.ctx.db.lock(), id), None);
     }

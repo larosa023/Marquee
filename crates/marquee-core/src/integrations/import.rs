@@ -101,7 +101,7 @@ pub fn read_table(bytes: &[u8], file_name: &str) -> Result<(Vec<String>, Vec<Row
         return Ok((columns, rows));
     }
     let first_line = text.lines().next().unwrap_or("");
-    let delim = [b',', b';', b'\t'].into_iter().max_by_key(|d| first_line.bytes().filter(|b| b == d).count()).unwrap_or(b',');
+    let delim = b",;\t".iter().copied().max_by_key(|d| first_line.bytes().filter(|b| b == d).count()).unwrap_or(b',');
     let mut rdr = csv::ReaderBuilder::new().flexible(true).delimiter(delim).from_reader(text.as_bytes());
     let columns: Vec<String> = rdr.headers()?.iter().map(|h| h.trim().to_string()).collect();
     if columns.len() < 2 {

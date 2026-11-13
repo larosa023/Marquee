@@ -12,7 +12,31 @@ use serde_json::Value;
 const BASE: &str = "https://ws.audioscrobbler.com/2.0/";
 
 /// Tags that say nothing about how music sounds.
-const NOISE_TAGS: &[&str] = &["seen live", "favorites", "favourites", "favorite", "albums i own", "love", "awesome", "beautiful", "all", "spotify", "under 2000 listeners", "female vocalists", "male vocalists", "american", "british", "usa", "uk", "00s", "10s", "20s", "90s", "70s", "60s"];
+const NOISE_TAGS: &[&str] = &[
+    "seen live",
+    "favorites",
+    "favourites",
+    "favorite",
+    "albums i own",
+    "love",
+    "awesome",
+    "beautiful",
+    "all",
+    "spotify",
+    "under 2000 listeners",
+    "female vocalists",
+    "male vocalists",
+    "american",
+    "british",
+    "usa",
+    "uk",
+    "00s",
+    "10s",
+    "20s",
+    "90s",
+    "70s",
+    "60s",
+];
 
 pub async fn call(ctx: &Ctx, method: &str, params: &[(&str, &str)], ttl: i64) -> Result<Value> {
     let key = ctx.require_key("lastfm_key")?;
@@ -63,14 +87,7 @@ pub async fn signed_post(ctx: &Ctx, method: &str, params: &[(&str, &str)], sk: O
 }
 
 fn clean_tags(v: &Value, limit: usize) -> Vec<String> {
-    list(&v["tag"])
-        .into_iter()
-        .filter(|t| i(t, "count").map(|c| c >= 8).unwrap_or(true))
-        .filter_map(|t| s(t, "name"))
-        .map(|t| t.to_lowercase())
-        .filter(|t| !NOISE_TAGS.contains(&t.as_str()) && t.len() <= 30)
-        .take(limit)
-        .collect()
+    list(&v["tag"]).into_iter().filter(|t| i(t, "count").map(|c| c >= 8).unwrap_or(true)).filter_map(|t| s(t, "name")).map(|t| t.to_lowercase()).filter(|t| !NOISE_TAGS.contains(&t.as_str()) && t.len() <= 30).take(limit).collect()
 }
 
 /// An artist's most-used tags, strongest first.
@@ -99,10 +116,7 @@ pub async fn chart_artists(ctx: &Ctx, limit: u32) -> Result<Vec<(String, Option<
 /// Well-known albums carrying a tag.
 pub async fn tag_albums(ctx: &Ctx, tag: &str, limit: u32) -> Result<Vec<Played>> {
     let v = call(ctx, "tag.getTopAlbums", &[("tag", tag), ("limit", &limit.to_string())], 7 * 86_400).await?;
-    Ok(list(&v["albums"]["album"])
-        .into_iter()
-        .filter_map(|a| Some(Played { artist: s(&a["artist"], "name")?, name: s(a, "name"), mbid: s(a, "mbid"), plays: 0, image: image(a) }))
-        .collect())
+    Ok(list(&v["albums"]["album"]).into_iter().filter_map(|a| Some(Played { artist: s(&a["artist"], "name")?, name: s(a, "name"), mbid: s(a, "mbid"), plays: 0, image: image(a) })).collect())
 }
 
 pub async fn album_info(ctx: &Ctx, artist: &str, album: &str) -> Result<Value> {
@@ -132,18 +146,12 @@ pub async fn user_info(ctx: &Ctx, user: &str) -> Result<Value> {
 /// period: overall | 7day | 1month | 3month | 6month | 12month
 pub async fn top_artists(ctx: &Ctx, user: &str, period: &str, limit: u32) -> Result<Vec<Played>> {
     let v = call(ctx, "user.getTopArtists", &[("user", user), ("period", period), ("limit", &limit.to_string())], 3600).await?;
-    Ok(list(&v["topartists"]["artist"])
-        .into_iter()
-        .filter_map(|a| Some(Played { artist: s(a, "name")?, name: None, mbid: s(a, "mbid"), plays: i(a, "playcount").unwrap_or(0), image: None }))
-        .collect())
+    Ok(list(&v["topartists"]["artist"]).into_iter().filter_map(|a| Some(Played { artist: s(a, "name")?, name: None, mbid: s(a, "mbid"), plays: i(a, "playcount").unwrap_or(0), image: None })).collect())
 }
 
 pub async fn top_albums(ctx: &Ctx, user: &str, period: &str, limit: u32) -> Result<Vec<Played>> {
     let v = call(ctx, "user.getTopAlbums", &[("user", user), ("period", period), ("limit", &limit.to_string())], 3600).await?;
-    Ok(list(&v["topalbums"]["album"])
-        .into_iter()
-        .filter_map(|a| Some(Played { artist: s(&a["artist"], "name")?, name: s(a, "name"), mbid: s(a, "mbid"), plays: i(a, "playcount").unwrap_or(0), image: image(a) }))
-        .collect())
+    Ok(list(&v["topalbums"]["album"]).into_iter().filter_map(|a| Some(Played { artist: s(&a["artist"], "name")?, name: s(a, "name"), mbid: s(a, "mbid"), plays: i(a, "playcount").unwrap_or(0), image: image(a) })).collect())
 }
 
 /// (artist, track, loved-at unix)

@@ -49,9 +49,7 @@ pub fn parse_query(q: &str) -> HashMap<String, String> {
 /// Waits for the browser to land on `http://127.0.0.1:<port><path>?...` and returns the query
 /// parameters. Other requests (favicons and the like) get a 404 and are ignored.
 pub async fn wait_for_redirect(port: u16, path: &str, timeout: Duration) -> Result<HashMap<String, String>> {
-    let listener = TcpListener::bind(("127.0.0.1", port)).await.map_err(|e| {
-        Error::msg(format!("Couldn't listen on 127.0.0.1:{port} for the sign-in ({e}). Close whatever is using that port and try again."))
-    })?;
+    let listener = TcpListener::bind(("127.0.0.1", port)).await.map_err(|e| Error::msg(format!("Couldn't listen on 127.0.0.1:{port} for the sign-in ({e}). Close whatever is using that port and try again.")))?;
     let accept = async {
         loop {
             let (mut sock, _) = listener.accept().await?;

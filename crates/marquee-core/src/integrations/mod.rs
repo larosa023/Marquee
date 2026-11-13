@@ -23,12 +23,28 @@ use serde_json::Value;
 pub enum WriteOp {
     /// `target`: "watchlist" (Trakt, Letterboxd), "wishlist" (Steam), "library" (Spotify)
     /// or "playlist:<id>" (Spotify).
-    AddToList { item_id: i64, target: String },
-    RemoveFromList { item_id: i64, target: String },
-    Rate { item_id: i64, stars: f64 },
-    MarkDone { item_id: i64, at: String },
-    Love { item_id: i64 },
-    Follow { item_id: i64 },
+    AddToList {
+        item_id: i64,
+        target: String,
+    },
+    RemoveFromList {
+        item_id: i64,
+        target: String,
+    },
+    Rate {
+        item_id: i64,
+        stars: f64,
+    },
+    MarkDone {
+        item_id: i64,
+        at: String,
+    },
+    Love {
+        item_id: i64,
+    },
+    Follow {
+        item_id: i64,
+    },
 }
 
 impl WriteOp {
@@ -106,10 +122,9 @@ pub fn statuses(ctx: &Ctx) -> Result<Vec<SourceStatus>> {
             note: src.note(),
         });
     }
-    for (id, name, note) in [
-        ("serializd", "Serializd", "Serializd has no public API or export. Import a JSON or CSV file of your diary instead."),
-        ("import", "File import", "Bring in anything as CSV or JSON: IMDb ratings, Backloggd, RateYourMusic and more."),
-    ] {
+    for (id, name, note) in
+        [("serializd", "Serializd", "Serializd has no public API or export. Import a JSON or CSV file of your diary instead."), ("import", "File import", "Bring in anything as CSV or JSON: IMDb ratings, Backloggd, RateYourMusic and more.")]
+    {
         let (status, account, last_sync, error) = store::source_row(&conn, id)?;
         out.push(SourceStatus { id: id.into(), name: name.into(), status, account, last_sync, error, config: store::source_config(&conn, id), configured: true, reads: vec!["ratings", "diary", "lists"], writes: vec![], note });
     }

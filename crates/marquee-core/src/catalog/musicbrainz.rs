@@ -63,7 +63,7 @@ fn rg_draft(rg: &Value, artist: &str, artist_mbid: Option<&str>) -> Option<ItemD
 
 fn tag_names(v: &Value) -> Vec<String> {
     let mut tags: Vec<(i64, String)> = arr(v, "genres").iter().chain(arr(v, "tags")).filter_map(|t| Some((i(t, "count").unwrap_or(0), s(t, "name")?))).collect();
-    tags.sort_by(|a, b| b.0.cmp(&a.0));
+    tags.sort_by_key(|t| std::cmp::Reverse(t.0));
     let mut out: Vec<String> = vec![];
     for (_, t) in tags {
         if !out.contains(&t) {

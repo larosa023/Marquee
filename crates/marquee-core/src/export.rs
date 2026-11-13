@@ -28,7 +28,15 @@ pub fn library_rows(ctx: &Ctx) -> Result<Vec<Value>> {
             let data: Value = serde_json::from_str(&r.get::<_, String>(5)?).unwrap_or(Value::Null);
             let kinds: String = r.get::<_, Option<String>>(7)?.unwrap_or_default();
             let creator = data["artist"].as_str().or(data["director"].as_str()).or(data["developer"].as_str()).or(data["network"].as_str()).unwrap_or("").to_string();
-            let status = if kinds.contains("rating") || kinds.contains("watched") || kinds.contains("play") { "done" } else if kinds.contains("wishlist") { "wishlist" } else if kinds.contains("owned") { "owned" } else { "saved" };
+            let status = if kinds.contains("rating") || kinds.contains("watched") || kinds.contains("play") {
+                "done"
+            } else if kinds.contains("wishlist") {
+                "wishlist"
+            } else if kinds.contains("owned") {
+                "owned"
+            } else {
+                "saved"
+            };
             Ok(json!({
                 "id": r.get::<_, i64>(0)?,
                 "media": r.get::<_, String>(1)?,
@@ -66,7 +74,8 @@ pub fn library_rows(ctx: &Ctx) -> Result<Vec<Value>> {
     Ok(out)
 }
 
-const COLUMNS: &[&str] = &["media", "title", "year", "release_date", "creator", "rating", "status", "liked", "play_amount", "last_activity", "lists", "sources", "genres", "tmdb_id", "imdb_id", "steam_id", "igdb_id", "mbid_id", "spotify_id"];
+const COLUMNS: &[&str] =
+    &["media", "title", "year", "release_date", "creator", "rating", "status", "liked", "play_amount", "last_activity", "lists", "sources", "genres", "tmdb_id", "imdb_id", "steam_id", "igdb_id", "mbid_id", "spotify_id"];
 
 pub fn library_csv(ctx: &Ctx) -> Result<String> {
     let mut w = csv::Writer::from_writer(vec![]);

@@ -77,7 +77,16 @@ fn phrase_for(title: &str, media: Media, events: &[&profile::Event]) -> Option<S
         });
     }
     if find(EventKind::Watched).is_some() {
-        return Some(format!("{} {t}", if matches!(media, Media::Album | Media::Artist) { "listened to" } else if media == Media::Game { "played" } else { "watched" }));
+        return Some(format!(
+            "{} {t}",
+            if matches!(media, Media::Album | Media::Artist) {
+                "listened to"
+            } else if media == Media::Game {
+                "played"
+            } else {
+                "watched"
+            }
+        ));
     }
     if find(EventKind::Wishlist).is_some() {
         return Some(format!("saved {t}"));
@@ -142,11 +151,8 @@ fn join_and(parts: &[String]) -> String {
 
 /// One or two short reasons, citing the user's actual history.
 fn reasons(item_id: i64, media: Media, features: &[(String, f64)], profile: &Profile, ev: &Evidence, dial: f64, creators: &HashMap<String, String>) -> Vec<String> {
-    let mut contrib: Vec<(f64, &String)> = features
-        .iter()
-        .filter_map(|(f, w)| profile.weights.get(f).map(|p| (p * w * kind_multiplier(f, dial), f)))
-        .filter(|(c, f)| *c > 0.02 && !matches!(f.as_bytes().first(), Some(b'e' | b'l' | b'n')))
-        .collect();
+    let mut contrib: Vec<(f64, &String)> =
+        features.iter().filter_map(|(f, w)| profile.weights.get(f).map(|p| (p * w * kind_multiplier(f, dial), f))).filter(|(c, f)| *c > 0.02 && !matches!(f.as_bytes().first(), Some(b'e' | b'l' | b'n'))).collect();
     contrib.sort_by(|a, b| b.0.total_cmp(&a.0));
     if contrib.is_empty() {
         return vec![];
@@ -290,13 +296,8 @@ pub fn score_all(db: &Db) -> Result<usize> {
                     score += settings.dial * 0.10 * r * unexplored;
                 }
             }
-            let creators: HashMap<String, String> = serde_json::from_str::<Value>(data)
-                .ok()
-                .and_then(|d| d["creators"].as_array().cloned())
-                .unwrap_or_default()
-                .iter()
-                .filter_map(|c| c["name"].as_str().map(|n| (format!("c:{}", slug(n)), n.to_string())))
-                .collect();
+            let creators: HashMap<String, String> =
+                serde_json::from_str::<Value>(data).ok().and_then(|d| d["creators"].as_array().cloned()).unwrap_or_default().iter().filter_map(|c| c["name"].as_str().map(|n| (format!("c:{}", slug(n)), n.to_string()))).collect();
             let why = if profile.is_empty() { vec![] } else { reasons(*id, *media, &feats, &profile, &evidence, settings.dial, &creators) };
             let pct = if profile.is_empty() || feats.is_empty() { None } else { Some(match_pct(score, r)) };
             ins.execute(params![id, score, pct.unwrap_or(-1), serde_json::to_string(&why)?, now_ts])?;
@@ -444,9 +445,7 @@ mod tests {
     }
 
     fn row(db: &Db, id: i64) -> (f64, i64, Vec<String>) {
-        db.lock()
-            .query_row("SELECT score, match_pct, why FROM scores WHERE item_id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?, serde_json::from_str(&r.get::<_, String>(2)?).unwrap())))
-            .unwrap()
+        db.lock().query_row("SELECT score, match_pct, why FROM scores WHERE item_id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?, serde_json::from_str(&r.get::<_, String>(2)?).unwrap()))).unwrap()
     }
 
     #[test]

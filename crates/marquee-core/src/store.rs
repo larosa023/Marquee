@@ -13,8 +13,7 @@ use serde_json::{json, Map, Value};
 // ------------------------------------------------------------------ settings
 
 pub fn get_setting<T: DeserializeOwned>(db: &Db, key: &str) -> Option<T> {
-    let raw: Option<String> =
-        db.lock().query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get(0)).optional().ok().flatten();
+    let raw: Option<String> = db.lock().query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get(0)).optional().ok().flatten();
     raw.and_then(|s| serde_json::from_str(&s).ok())
 }
 
@@ -23,10 +22,7 @@ pub fn setting_or<T: DeserializeOwned>(db: &Db, key: &str, default: T) -> T {
 }
 
 pub fn set_setting<T: Serialize>(db: &Db, key: &str, value: &T) -> Result<()> {
-    db.lock().execute(
-        "INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-        params![key, serde_json::to_string(value)?],
-    )?;
+    db.lock().execute("INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET value = excluded.value", params![key, serde_json::to_string(value)?])?;
     Ok(())
 }
 
@@ -45,21 +41,14 @@ pub fn all_settings(db: &Db) -> Result<Map<String, Value>> {
 // --------------------------------------------------------------------- items
 
 pub fn find_item(conn: &Connection, source: &str, media: Media, ext_id: &str) -> Result<Option<i64>> {
-    Ok(conn
-        .query_row(
-            "SELECT item_id FROM item_ids WHERE source = ?1 AND media = ?2 AND ext_id = ?3",
-            params![source, media.as_str(), ext_id],
-            |r| r.get(0),
-        )
-        .optional()?)
+    Ok(conn.query_row("SELECT item_id FROM item_ids WHERE source = ?1 AND media = ?2 AND ext_id = ?3", params![source, media.as_str(), ext_id], |r| r.get(0)).optional()?)
 }
 
 /// Looser match for imports that only have a title and year.
 pub fn find_item_by_title(conn: &Connection, media: Media, title: &str, year: Option<i32>) -> Result<Option<i64>> {
     let st = sort_title(title);
     let mut stmt = conn.prepare("SELECT id, year FROM items WHERE media = ?1 AND sort_title = ?2")?;
-    let rows: Vec<(i64, Option<i32>)> =
-        stmt.query_map(params![media.as_str(), st], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<rusqlite::Result<_>>()?;
+    let rows: Vec<(i64, Option<i32>)> = stmt.query_map(params![media.as_str(), st], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<rusqlite::Result<_>>()?;
     Ok(match year {
         Some(y) => rows.iter().find(|(_, iy)| iy.map(|iy| (iy - y).abs() <= 1).unwrap_or(false)).or(if rows.len() == 1 { rows.first() } else { None }).map(|r| r.0),
         None => rows.first().map(|r| r.0),
@@ -77,13 +66,7 @@ pub fn upsert_item(conn: &Connection, d: &ItemDraft) -> Result<i64> {
 /// Finds an album by artist and title, so the same record arriving from Spotify, Last.fm and
 /// MusicBrainz (each with its own id) becomes one item.
 pub fn find_album(conn: &Connection, artist: &str, title: &str) -> Result<Option<i64>> {
-    Ok(conn
-        .query_row(
-            "SELECT id FROM items WHERE media = 'album' AND sort_title = ?1 AND lower(json_extract(data, '$.artist')) = lower(?2) LIMIT 1",
-            params![sort_title(title), artist],
-            |r| r.get(0),
-        )
-        .optional()?)
+    Ok(conn.query_row("SELECT id FROM items WHERE media = 'album' AND sort_title = ?1 AND lower(json_extract(data, '$.artist')) = lower(?2) LIMIT 1", params![sort_title(title), artist], |r| r.get(0)).optional()?)
 }
 
 /// Like `upsert_item`, but `target` (when given) names the item to update regardless of ids.
@@ -125,8 +108,7 @@ pub fn upsert_item_at(conn: &Connection, d: &ItemDraft, target: Option<i64>) -> 
 
     let id = match existing {
         Some(id) => {
-            let (old_level, old_data): (i64, String) =
-                conn.query_row("SELECT detail_level, data FROM items WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?)))?;
+            let (old_level, old_data): (i64, String) = conn.query_row("SELECT detail_level, data FROM items WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?)))?;
             // Merge JSON: new keys win, but a stub keeps what a detail fetch stored.
             let mut merged: Map<String, Value> = serde_json::from_str(&old_data).unwrap_or_default();
             for (k, v) in data {
@@ -147,9 +129,21 @@ pub fn upsert_item_at(conn: &Connection, d: &ItemDraft, target: Option<i64>) -> 
                     updated_at = ?14, expires_at = ?15
                  WHERE id = ?1",
                 params![
-                    id, d.title, sort_title(&d.title), year, d.release_date, d.poster, d.backdrop,
-                    d.overview.as_deref().filter(|s| !s.is_empty()), d.runtime, d.popularity, d.rating,
-                    Value::Object(merged).to_string(), level, now, expires
+                    id,
+                    d.title,
+                    sort_title(&d.title),
+                    year,
+                    d.release_date,
+                    d.poster,
+                    d.backdrop,
+                    d.overview.as_deref().filter(|s| !s.is_empty()),
+                    d.runtime,
+                    d.popularity,
+                    d.rating,
+                    Value::Object(merged).to_string(),
+                    level,
+                    now,
+                    expires
                 ],
             )?;
             id
@@ -162,20 +156,14 @@ pub fn upsert_item_at(conn: &Connection, d: &ItemDraft, target: Option<i64>) -> 
                 "INSERT INTO items (media, title, sort_title, year, release_date, poster, backdrop, overview, runtime,
                                     popularity, rating, data, detail_level, updated_at, expires_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
-                params![
-                    media.as_str(), d.title, sort_title(&d.title), year, d.release_date, d.poster, d.backdrop,
-                    d.overview, d.runtime, d.popularity, d.rating, Value::Object(data).to_string(), d.detail_level, now, expires
-                ],
+                params![media.as_str(), d.title, sort_title(&d.title), year, d.release_date, d.poster, d.backdrop, d.overview, d.runtime, d.popularity, d.rating, Value::Object(data).to_string(), d.detail_level, now, expires],
             )?;
             conn.last_insert_rowid()
         }
     };
 
     for (source, ext) in &d.ids {
-        conn.execute(
-            "INSERT OR IGNORE INTO item_ids (source, ext_id, media, item_id) VALUES (?1, ?2, ?3, ?4)",
-            params![source, ext, media.as_str(), id],
-        )?;
+        conn.execute("INSERT OR IGNORE INTO item_ids (source, ext_id, media, item_id) VALUES (?1, ?2, ?3, ?4)", params![source, ext, media.as_str(), id])?;
     }
 
     // Features: a stub adds to what's there; a detail fetch replaces the set.
@@ -250,12 +238,7 @@ pub fn get_item(conn: &Connection, id: i64) -> Result<Item> {
 }
 
 pub fn item_is_stale(conn: &Connection, id: i64) -> bool {
-    conn.query_row(
-        "SELECT detail_level < 1 OR expires_at IS NULL OR expires_at < ?2 FROM items WHERE id = ?1",
-        params![id, now()],
-        |r| r.get(0),
-    )
-    .unwrap_or(true)
+    conn.query_row("SELECT detail_level < 1 OR expires_at IS NULL OR expires_at < ?2 FROM items WHERE id = ?1", params![id, now()], |r| r.get(0)).unwrap_or(true)
 }
 
 pub fn item_features(conn: &Connection, id: i64) -> Result<Vec<(String, f64)>> {
@@ -277,7 +260,7 @@ pub fn card_from_row(r: &Row) -> rusqlite::Result<Card> {
     let data: Value = serde_json::from_str(&r.get::<_, String>(13)?).unwrap_or(Value::Null);
     let why: Vec<String> = r.get::<_, Option<String>>(12)?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
     let mut meta = Map::new();
-    for key in ["artist", "price", "discount", "platforms", "providers", "next_episode", "album_type", "status", "deck", "low", "seasons_count", "network", "developer", "director"] {
+    for key in ["artist", "price", "discount", "platforms", "providers", "next_episode", "album_type", "status", "deck", "low", "seasons_count", "network", "developer", "director", "trailer", "spotify_url", "store_url"] {
         if let Some(v) = data.get(key).filter(|v| !v.is_null()) {
             meta.insert(key.into(), v.clone());
         }
@@ -331,6 +314,7 @@ pub fn cards_by_ids(conn: &Connection, ids: &[i64]) -> Result<Vec<Card>> {
 // -------------------------------------------------------------------- events
 
 /// Records (or updates) one thing the user did. Returns true when something changed.
+#[allow(clippy::too_many_arguments)]
 pub fn record_event(conn: &Connection, item_id: i64, source: &str, kind: EventKind, value: f64, at: Option<&str>, first_at: Option<&str>, meta: &Value) -> Result<bool> {
     let at = at.map(str::to_string).unwrap_or_else(now);
     let n = conn.execute(
@@ -356,14 +340,7 @@ pub fn clear_source_events(conn: &Connection, source: &str) -> Result<usize> {
 }
 
 pub fn user_rating(conn: &Connection, item_id: i64) -> Option<f64> {
-    conn.query_row(
-        "SELECT value FROM user_events WHERE item_id = ?1 AND kind = 'rating' ORDER BY (source = 'marquee') DESC, at DESC LIMIT 1",
-        [item_id],
-        |r| r.get(0),
-    )
-    .optional()
-    .ok()
-    .flatten()
+    conn.query_row("SELECT value FROM user_events WHERE item_id = ?1 AND kind = 'rating' ORDER BY (source = 'marquee') DESC, at DESC LIMIT 1", [item_id], |r| r.get(0)).optional().ok().flatten()
 }
 
 pub fn has_event(conn: &Connection, item_id: i64, kinds: &[&str]) -> bool {
@@ -374,9 +351,7 @@ pub fn has_event(conn: &Connection, item_id: i64, kinds: &[&str]) -> bool {
 // --------------------------------------------------------------------- lists
 
 pub fn list_id(conn: &Connection, slug: &str) -> Result<i64> {
-    conn.query_row("SELECT id FROM lists WHERE slug = ?1", [slug], |r| r.get(0))
-        .optional()?
-        .ok_or_else(|| Error::msg(format!("There's no list called \"{slug}\".")))
+    conn.query_row("SELECT id FROM lists WHERE slug = ?1", [slug], |r| r.get(0)).optional()?.ok_or_else(|| Error::msg(format!("There's no list called \"{slug}\".")))
 }
 
 pub fn lists(conn: &Connection) -> Result<Vec<ListInfo>> {
@@ -384,11 +359,7 @@ pub fn lists(conn: &Connection) -> Result<Vec<ListInfo>> {
         "SELECT l.id, l.slug, l.name, l.kind, l.mirror, (SELECT count(*) FROM list_items li WHERE li.list_id = l.id)
          FROM lists l ORDER BY (l.kind = 'system') DESC, l.position, l.id",
     )?;
-    let mut out: Vec<ListInfo> = stmt
-        .query_map([], |r| {
-            Ok(ListInfo { id: r.get(0)?, slug: r.get(1)?, name: r.get(2)?, kind: r.get(3)?, mirror: r.get(4)?, count: r.get(5)?, covers: vec![] })
-        })?
-        .collect::<rusqlite::Result<_>>()?;
+    let mut out: Vec<ListInfo> = stmt.query_map([], |r| Ok(ListInfo { id: r.get(0)?, slug: r.get(1)?, name: r.get(2)?, kind: r.get(3)?, mirror: r.get(4)?, count: r.get(5)?, covers: vec![] }))?.collect::<rusqlite::Result<_>>()?;
     let mut covers = conn.prepare(
         "SELECT i.poster FROM list_items li JOIN items i ON i.id = li.item_id
          WHERE li.list_id = ?1 AND i.poster IS NOT NULL ORDER BY li.position, li.added_at DESC LIMIT 4",
@@ -478,9 +449,7 @@ pub fn list_entries(conn: &Connection, list_id: i64) -> Result<Vec<ListEntry>> {
          JOIN list_items li ON li.item_id = i.id WHERE li.list_id = ?1 ORDER BY li.position, li.added_at DESC"
     );
     let mut stmt = conn.prepare(&sql)?;
-    let rows = stmt
-        .query_map([list_id], |r| Ok(ListEntry { card: card_from_row(r)?, sync_state: r.get(17)?, added_at: r.get(18)?, note: r.get(19)? }))?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let rows = stmt.query_map([list_id], |r| Ok(ListEntry { card: card_from_row(r)?, sync_state: r.get(17)?, added_at: r.get(18)?, note: r.get(19)? }))?.collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(rows)
 }
 
@@ -521,9 +490,7 @@ pub struct Follow {
 
 pub fn follows(conn: &Connection) -> Result<Vec<Follow>> {
     let mut stmt = conn.prepare("SELECT id, kind, ref, name, item_id FROM follows ORDER BY created_at DESC")?;
-    let rows = stmt
-        .query_map([], |r| Ok(Follow { id: r.get(0)?, kind: r.get(1)?, reference: r.get(2)?, name: r.get(3)?, item_id: r.get(4)? }))?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let rows = stmt.query_map([], |r| Ok(Follow { id: r.get(0)?, kind: r.get(1)?, reference: r.get(2)?, name: r.get(3)?, item_id: r.get(4)? }))?.collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(rows)
 }
 
@@ -531,30 +498,19 @@ pub fn follows(conn: &Connection) -> Result<Vec<Follow>> {
 
 /// Stores a notification once (`dedupe` identifies it). Returns its id when it's new.
 pub fn add_notification(conn: &Connection, kind: &str, dedupe: &str, title: &str, body: &str, item_id: Option<i64>) -> Result<Option<i64>> {
-    let n = conn.execute(
-        "INSERT OR IGNORE INTO notifications (kind, dedupe, title, body, item_id, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![kind, dedupe, title, body, item_id, now()],
-    )?;
+    let n = conn.execute("INSERT OR IGNORE INTO notifications (kind, dedupe, title, body, item_id, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)", params![kind, dedupe, title, body, item_id, now()])?;
     Ok(if n > 0 { Some(conn.last_insert_rowid()) } else { None })
 }
 
 pub fn notifications(conn: &Connection, limit: i64) -> Result<Vec<Notification>> {
     let mut stmt = conn.prepare("SELECT id, kind, title, body, item_id, created_at, read_at IS NOT NULL FROM notifications ORDER BY created_at DESC, id DESC LIMIT ?1")?;
-    let rows = stmt
-        .query_map([limit], |r| {
-            Ok(Notification { id: r.get(0)?, kind: r.get(1)?, title: r.get(2)?, body: r.get(3)?, item_id: r.get(4)?, created_at: r.get(5)?, read: r.get(6)? })
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let rows = stmt.query_map([limit], |r| Ok(Notification { id: r.get(0)?, kind: r.get(1)?, title: r.get(2)?, body: r.get(3)?, item_id: r.get(4)?, created_at: r.get(5)?, read: r.get(6)? }))?.collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(rows)
 }
 
 pub fn untoasted(conn: &Connection) -> Result<Vec<Notification>> {
     let mut stmt = conn.prepare("SELECT id, kind, title, body, item_id, created_at, read_at IS NOT NULL FROM notifications WHERE toasted = 0 ORDER BY id")?;
-    let rows = stmt
-        .query_map([], |r| {
-            Ok(Notification { id: r.get(0)?, kind: r.get(1)?, title: r.get(2)?, body: r.get(3)?, item_id: r.get(4)?, created_at: r.get(5)?, read: r.get(6)? })
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let rows = stmt.query_map([], |r| Ok(Notification { id: r.get(0)?, kind: r.get(1)?, title: r.get(2)?, body: r.get(3)?, item_id: r.get(4)?, created_at: r.get(5)?, read: r.get(6)? }))?.collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(rows)
 }
 
@@ -583,10 +539,7 @@ pub fn set_source_status(conn: &Connection, id: &str, status: &str) -> Result<()
 }
 
 pub fn source_config(conn: &Connection, id: &str) -> Value {
-    conn.query_row("SELECT config FROM sources WHERE id = ?1", [id], |r| r.get::<_, String>(0))
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_else(|| json!({}))
+    conn.query_row("SELECT config FROM sources WHERE id = ?1", [id], |r| r.get::<_, String>(0)).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_else(|| json!({}))
 }
 
 pub fn set_source_config(conn: &Connection, id: &str, patch: Value) -> Result<()> {
@@ -604,7 +557,10 @@ pub fn set_source_config(conn: &Connection, id: &str, patch: Value) -> Result<()
     Ok(())
 }
 
-pub fn source_row(conn: &Connection, id: &str) -> Result<(String, Option<String>, Option<String>, Option<String>)> {
+/// A connection's status, account name, last sync time and last error.
+pub type SourceRow = (String, Option<String>, Option<String>, Option<String>);
+
+pub fn source_row(conn: &Connection, id: &str) -> Result<SourceRow> {
     Ok(conn.query_row("SELECT status, account, last_sync, error FROM sources WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?)
 }
 
@@ -673,8 +629,7 @@ mod tests {
         assert!(record_event(&conn, id, "steam", EventKind::Play, 60.0, Some("2025-01-01T00:00:00Z"), None, &Value::Null).unwrap());
         assert!(record_event(&conn, id, "steam", EventKind::Play, 600.0, Some("2025-06-01T00:00:00Z"), None, &Value::Null).unwrap());
         assert!(!record_event(&conn, id, "steam", EventKind::Play, 600.0, Some("2025-06-01T00:00:00Z"), None, &Value::Null).unwrap());
-        let (value, at, first): (f64, String, String) =
-            conn.query_row("SELECT value, at, first_at FROM user_events WHERE item_id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap();
+        let (value, at, first): (f64, String, String) = conn.query_row("SELECT value, at, first_at FROM user_events WHERE item_id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap();
         assert_eq!(value, 600.0);
         assert!(at.starts_with("2025-06") && first.starts_with("2025-01"));
     }

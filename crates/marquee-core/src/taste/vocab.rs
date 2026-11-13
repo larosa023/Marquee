@@ -729,7 +729,7 @@ fn length_bucket(media: Media, minutes: i64) -> Option<&'static str> {
     }
     let (short, long) = match media {
         Media::Movie => (95, 140),
-        Media::Tv => (32, 55),        // episode length
+        Media::Tv => (32, 55),            // episode length
         Media::Game => (8 * 60, 40 * 60), // time to beat
         Media::Album => (32, 60),
         Media::Artist => return None,

@@ -169,7 +169,11 @@ impl Source for Lastfm {
                 let artist = item.data["artist"].as_str().unwrap_or("").to_string();
                 // Last.fm loves tracks, not albums: love the album's first track.
                 let info = api::album_info(ctx, &artist, &item.title).await?;
-                let track = list(&info["tracks"]["track"]).first().and_then(|t| s(t, "name")).or_else(|| item.data["tracks"][0]["title"].as_str().map(String::from)).ok_or_else(|| Error::msg(format!("Last.fm has no track list for {}.", item.title)))?;
+                let track = list(&info["tracks"]["track"])
+                    .first()
+                    .and_then(|t| s(t, "name"))
+                    .or_else(|| item.data["tracks"][0]["title"].as_str().map(String::from))
+                    .ok_or_else(|| Error::msg(format!("Last.fm has no track list for {}.", item.title)))?;
                 api::signed_post(ctx, "track.love", &[("artist", &artist), ("track", &track)], Some(&sk)).await?;
                 Ok(WriteOutcome::Synced)
             }
@@ -207,7 +211,11 @@ mod tests {
         t.net.on("method=user.getTopArtists", 200, r#"{"topartists":{"artist":[]}}"#);
         t.net.on("period=overall", 200, top);
         t.net.on("period=1month", 200, r#"{"topartists":{"artist":{"name":"Tycho","mbid":"","playcount":"40"}}}"#);
-        t.net.on("method=user.getTopAlbums", 200, r##"{"topalbums":{"album":[{"name":"Dive","playcount":"310","mbid":"","artist":{"name":"Tycho"},"image":[{"size":"small","#text":""},{"size":"extralarge","#text":"https://l/dive.jpg"}]}]}}"##);
+        t.net.on(
+            "method=user.getTopAlbums",
+            200,
+            r##"{"topalbums":{"album":[{"name":"Dive","playcount":"310","mbid":"","artist":{"name":"Tycho"},"image":[{"size":"small","#text":""},{"size":"extralarge","#text":"https://l/dive.jpg"}]}]}}"##,
+        );
         t.net.on("method=user.getLovedTracks", 200, r#"{"lovedtracks":{"track":[{"name":"Awake","date":{"uts":"1700000000"},"artist":{"name":"Tycho"}},{"name":"Dive","date":{"uts":"1600000000"},"artist":{"name":"Tycho"}}]}}"#);
         t.net.on("method=user.getRecentTracks", 200, r#"{"recenttracks":{"track":[],"@attr":{"total":"420"}}}"#);
         let synced = Lastfm.sync(&t.ctx).await.unwrap();

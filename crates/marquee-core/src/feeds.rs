@@ -86,10 +86,7 @@ fn where_clause(ctx: &Ctx, f: &Filters) -> (String, Vec<Sql>) {
         if mine.is_empty() {
             sql.push("0".into());
         } else {
-            sql.push(format!(
-                "EXISTS (SELECT 1 FROM json_each(i.data, '$.providers.stream') p WHERE json_extract(p.value, '$.id') IN ({}))",
-                mine.iter().map(|m| m.to_string()).collect::<Vec<_>>().join(",")
-            ));
+            sql.push(format!("EXISTS (SELECT 1 FROM json_each(i.data, '$.providers.stream') p WHERE json_extract(p.value, '$.id') IN ({}))", mine.iter().map(|m| m.to_string()).collect::<Vec<_>>().join(",")));
         }
     }
     if f.on_sale {
@@ -266,24 +263,11 @@ pub fn home(ctx: &Ctx) -> Result<Value> {
         {
             let conn = ctx.db.lock();
             for m in Media::FEED {
-                let cut: f64 = conn
-                    .query_row(
-                        "SELECT popularity FROM items WHERE media = ?1 ORDER BY popularity DESC LIMIT 1 OFFSET (SELECT count(*) * 2 / 5 FROM items WHERE media = ?1)",
-                        [m.as_str()],
-                        |r| r.get(0),
-                    )
-                    .unwrap_or(f64::MAX);
+                let cut: f64 = conn.query_row("SELECT popularity FROM items WHERE media = ?1 ORDER BY popularity DESC LIMIT 1 OFFSET (SELECT count(*) * 2 / 5 FROM items WHERE media = ?1)", [m.as_str()], |r| r.get(0)).unwrap_or(f64::MAX);
                 cutoffs.push(format!("WHEN '{}' THEN {}", m.as_str(), if cut.is_finite() && cut < 1e12 { cut } else { 1e12 }));
             }
         }
-        let gems = query_cards(
-            ctx,
-            &format!("{VISIBLE} AND s.match_pct >= 72 AND i.release_date <= ? AND {NOT_DONE} AND i.popularity <= CASE i.media {} ELSE 1e12 END", cutoffs.join(" ")),
-            &[t(&today)],
-            "s.score DESC",
-            80,
-            0,
-        )?;
+        let gems = query_cards(ctx, &format!("{VISIBLE} AND s.match_pct >= 72 AND i.release_date <= ? AND {NOT_DONE} AND i.popularity <= CASE i.media {} ELSE 1e12 END", cutoffs.join(" ")), &[t(&today)], "s.score DESC", 80, 0)?;
         push(row("gems", "Hidden Gems For You", "Strong matches that flew under the radar", spread(ctx, gems, 20, lambda.max(0.45))?));
     }
 
@@ -402,7 +386,11 @@ pub fn calendar(ctx: &Ctx, from: &str, to: &str, scope: &str) -> Result<Vec<Cale
         out.push(CalendarEntry { date, kind: if card.media == "tv" { "premiere" } else { "release" }, label, card, pinned });
     }
     // Episodes of shows being tracked (or everything airing, in the "all" scope).
-    let ep_scope = if scope == "all" { "1" } else { "(EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind IN ('watched', 'rating', 'like', 'play')) OR EXISTS (SELECT 1 FROM list_items l WHERE l.item_id = i.id) OR EXISTS (SELECT 1 FROM follows fo WHERE fo.item_id = i.id))" };
+    let ep_scope = if scope == "all" {
+        "1"
+    } else {
+        "(EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind IN ('watched', 'rating', 'like', 'play')) OR EXISTS (SELECT 1 FROM list_items l WHERE l.item_id = i.id) OR EXISTS (SELECT 1 FROM follows fo WHERE fo.item_id = i.id))"
+    };
     let ep_sql = format!("SELECT {CARD_COLS} FROM {CARD_FROM} WHERE i.media = 'tv' AND json_extract(i.data, '$.next_episode.air_date') BETWEEN ?1 AND ?2 AND {ep_scope} LIMIT 300");
     let mut stmt = conn.prepare(&ep_sql)?;
     for card in stmt.query_map([from, to], store::card_from_row)? {
@@ -412,7 +400,13 @@ pub fn calendar(ctx: &Ctx, from: &str, to: &str, scope: &str) -> Result<Vec<Cale
         if out.iter().any(|x: &CalendarEntry| x.card.id == card.id && x.date == date) {
             continue; // the series premiere is already listed as a release
         }
-        let (kind, label) = if e == 1 { ("premiere", format!("Season {s} premiere")) } else if ep["finale"] == true { ("finale", format!("Season {s} finale")) } else { ("episode", format!("S{s} E{e}")) };
+        let (kind, label) = if e == 1 {
+            ("premiere", format!("Season {s} premiere"))
+        } else if ep["finale"] == true {
+            ("finale", format!("Season {s} finale"))
+        } else {
+            ("episode", format!("S{s} E{e}"))
+        };
         out.push(CalendarEntry { date, kind, label, card, pinned: scope != "all" });
     }
     out.sort_by(|a, b| a.date.cmp(&b.date).then(b.pinned.cmp(&a.pinned)).then(b.card.match_pct.cmp(&a.card.match_pct)));
@@ -518,11 +512,7 @@ pub async fn detail(ctx: &Ctx, item_id: i64) -> Result<Value> {
         let rows = stmt.query_map([item_id], |r| Ok(json!({ "source": r.get::<_, String>(0)?, "kind": r.get::<_, String>(1)?, "value": r.get::<_, f64>(2)?, "at": r.get::<_, String>(3)? })))?.collect::<rusqlite::Result<_>>()?;
         rows
     };
-    let features: Vec<Value> = store::item_features(&conn, item_id)?
-        .into_iter()
-        .filter(|(f, _)| f.starts_with("t:"))
-        .map(|(f, w)| json!({ "feature": f, "label": vocab::label(&f), "weight": w }))
-        .collect();
+    let features: Vec<Value> = store::item_features(&conn, item_id)?.into_iter().filter(|(f, _)| f.starts_with("t:")).map(|(f, w)| json!({ "feature": f, "label": vocab::label(&f), "weight": w })).collect();
     let connected: Vec<String> = {
         let mut stmt = conn.prepare("SELECT id FROM sources WHERE status != 'disconnected'")?;
         let rows = stmt.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
@@ -751,18 +741,13 @@ pub fn stats(ctx: &Ctx) -> Result<Value> {
     let monthly: Vec<Value> = months.iter().map(|(m, (w, l))| json!({ "month": m, "watched": (w * 10.0).round() / 10.0, "listened": (l * 10.0).round() / 10.0 })).collect();
 
     // Playing: Steam reports lifetime and last-two-weeks totals, not a monthly history.
-    let (played_total, played_recent): (f64, f64) = conn.query_row(
-        "SELECT COALESCE(sum(e.value), 0) / 60.0, COALESCE(sum(json_extract(e.meta, '$.recent_minutes')), 0) / 60.0 FROM user_events e JOIN items i ON i.id = e.item_id WHERE e.kind = 'play' AND i.media = 'game'",
-        [],
-        |r| Ok((r.get(0)?, r.get(1)?)),
-    )?;
+    let (played_total, played_recent): (f64, f64) =
+        conn.query_row("SELECT COALESCE(sum(e.value), 0) / 60.0, COALESCE(sum(json_extract(e.meta, '$.recent_minutes')), 0) / 60.0 FROM user_events e JOIN items i ON i.id = e.item_id WHERE e.kind = 'play' AND i.media = 'game'", [], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })?;
 
     let top = |media: &str| -> Result<Vec<Card>> {
-        cards(
-            &conn,
-            "JOIN user_events e ON e.item_id = i.id WHERE i.media = ?1 AND e.kind = 'rating' AND e.at >= ?2 GROUP BY i.id ORDER BY max(e.value) DESC, max(e.at) DESC LIMIT 5",
-            &[&media, &format!("{year}-01-01")],
-        )
+        cards(&conn, "JOIN user_events e ON e.item_id = i.id WHERE i.media = ?1 AND e.kind = 'rating' AND e.at >= ?2 GROUP BY i.id ORDER BY max(e.value) DESC, max(e.at) DESC LIMIT 5", &[&media, &format!("{year}-01-01")])
     };
     let top_year = json!({ "movie": top("movie")?, "tv": top("tv")?, "game": top("game")?, "album": top("album")? });
 
@@ -778,7 +763,11 @@ pub fn stats(ctx: &Ctx) -> Result<Value> {
     if weeks.first().map(|w| this_week - w <= 1).unwrap_or(false) {
         current = 1;
         for pair in weeks.windows(2) {
-            if pair[0] - pair[1] == 1 { current += 1 } else { break }
+            if pair[0] - pair[1] == 1 {
+                current += 1
+            } else {
+                break;
+            }
         }
     }
     let mut longest = if weeks.is_empty() { 0 } else { 1 };
@@ -814,6 +803,7 @@ mod tests {
     use crate::ctx::testing::{ctx, TestCtx};
     use crate::store::{record_event, upsert_item};
 
+    #[allow(clippy::too_many_arguments)]
     fn add(t: &TestCtx, media: Media, title: &str, days: i64, genres: &[&str], tags: &[&str], pop: f64, f: impl FnOnce(&mut ItemDraft)) -> i64 {
         let mut d = ItemDraft::new(media, title).id("test", title);
         d.release_date = Some(days_from_today(days));
@@ -834,18 +824,27 @@ mod tests {
         record_event(&t.ctx.db.lock(), loved, "marquee", EventKind::Rating, 5.0, None, None, &Value::Null).unwrap();
         ids.insert("scifi_film", add(&t, Media::Movie, "Signal Lost", 1, &["Science Fiction"], &["space"], 80.0, |_| {}));
         ids.insert("romcom", add(&t, Media::Movie, "Meet Cute", 1, &["Romance", "Comedy"], &[], 90.0, |_| {}));
-        ids.insert("game", add(&t, Media::Game, "Void Drift", 20, &["Adventure"], &["space", "exploration"], 30.0, |d| {
-            d.set("platforms", json!(["PC", "PS5"]));
-            d.set("price", json!({ "cents": 1999, "text": "$19.99" }));
-            d.set("discount", 30);
-        }));
-        ids.insert("album", add(&t, Media::Album, "Neon Tides", 5, &[], &["synthwave", "space"], 5.0, |d| {
-            d.set("artist", "Lumen Drift");
-            d.set("album_type", "album");
-        }));
-        ids.insert("show", add(&t, Media::Tv, "Severance", -1400, &["Sci-Fi & Fantasy"], &["dystopia"], 70.0, |d| {
-            d.set("next_episode", json!({ "air_date": days_from_today(3), "season": 3, "episode": 1 }));
-        }));
+        ids.insert(
+            "game",
+            add(&t, Media::Game, "Void Drift", 20, &["Adventure"], &["space", "exploration"], 30.0, |d| {
+                d.set("platforms", json!(["PC", "PS5"]));
+                d.set("price", json!({ "cents": 1999, "text": "$19.99" }));
+                d.set("discount", 30);
+            }),
+        );
+        ids.insert(
+            "album",
+            add(&t, Media::Album, "Neon Tides", 5, &[], &["synthwave", "space"], 5.0, |d| {
+                d.set("artist", "Lumen Drift");
+                d.set("album_type", "album");
+            }),
+        );
+        ids.insert(
+            "show",
+            add(&t, Media::Tv, "Severance", -1400, &["Sci-Fi & Fantasy"], &["dystopia"], 70.0, |d| {
+                d.set("next_episode", json!({ "air_date": days_from_today(3), "season": 3, "episode": 1 }));
+            }),
+        );
         record_event(&t.ctx.db.lock(), ids["show"], "trakt", EventKind::Watched, 1.0, None, None, &Value::Null).unwrap();
         ids.insert("old", add(&t, Media::Movie, "Old Film", -400, &["Science Fiction"], &["space"], 10.0, |_| {}));
         for n in 0..12 {

@@ -66,11 +66,7 @@ impl Ctx {
     }
 
     pub fn key(&self, name: &str) -> Option<String> {
-        self.secrets
-            .get(&format!("key.{name}"))
-            .filter(|v| !v.trim().is_empty())
-            .or_else(|| self.default_keys.get(name).filter(|v| !v.trim().is_empty()).cloned())
-            .map(|v| v.trim().to_string())
+        self.secrets.get(&format!("key.{name}")).filter(|v| !v.trim().is_empty()).or_else(|| self.default_keys.get(name).filter(|v| !v.trim().is_empty()).cloned()).map(|v| v.trim().to_string())
     }
 
     pub fn has_key(&self, name: &str) -> bool {
