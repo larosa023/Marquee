@@ -1,7 +1,10 @@
-# Builds Marquee for Windows and publishes a GitHub Release when a version tag is pushed.
+# Builds Marquee for Windows and publishes a GitHub Release, by itself, whenever the version on
+# `main` changes. Nobody tags anything: bump the version (npm run set-version -- 0.2.0), add a
+# CHANGELOG.md section, push to main, and the release appears within about 20 minutes. Installed
+# copies then offer the update on their own.
 #
-#   git tag v0.1.0 && git push origin v0.1.0        a stable release
-#   git tag v0.2.0-beta.1 && git push origin ...    a beta (marked "pre-release")
+# A version with a suffix (0.2.0-beta.1) is published as a pre-release, for the Beta channel.
+# Pushing a v* tag, or "Run workflow" on the Actions tab, also works.
 #
 # The release carries:
 #   Marquee_<version>_x64-setup.exe   the installer (NSIS, per-user, no admin prompt)
@@ -14,13 +17,48 @@ name: Release
 
 on:
   push:
+    branches: [main]
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  # Is there a version on main that hasn't been released yet?
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+      new: ${{ steps.v.outputs.new }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match the version in tauri.conf.json ($version)."; exit 1
+          fi
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | map(.name) | index("latest.json")' 2>/dev/null | grep -qE '^[0-9]+$'; then
+            echo "v$version is already released; nothing to do."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Releasing v$version."
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: check
+    if: needs.check.outputs.new == 'true'
     runs-on: windows-latest
     env:
       # App-level keys are baked into the build (see src-tauri/build.rs). Any that are missing
@@ -44,11 +82,8 @@ jobs:
         id: v
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
-          $conf = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
-          if ($version -ne $conf) { throw "Tag v$version doesn't match the version in tauri.conf.json ($conf). Run: npm run set-version -- $version" }
-          "version=$version" >> $env:GITHUB_OUTPUT
-          "prerelease=$(($version -match '-').ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          "version=${{ needs.check.outputs.version }}" >> $env:GITHUB_OUTPUT
+          "prerelease=${{ needs.check.outputs.prerelease }}" >> $env:GITHUB_OUTPUT
 
       - name: Check the signing setup
         shell: pwsh

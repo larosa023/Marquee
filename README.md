@@ -116,11 +116,10 @@ Each release:
 npm run set-version -- 0.2.0     # package.json, Cargo.toml, tauri.conf.json, hangar.json
 # add a "## 0.2.0" section to CHANGELOG.md
 git commit -am "Marquee 0.2.0"
-git tag v0.2.0
-git push origin main v0.2.0
+git push origin main
 ```
 
-The Release workflow builds the installer, MSI and portable zip, signs the update, publishes the GitHub Release with that changelog section as its notes, and refreshes the Beta channel. A version with a suffix (`0.2.0-beta.1`) is published as a pre-release and only reaches people on the Beta channel.
+That's all: no tag, nothing to click. When the version on `main` hasn't been released yet, the Release workflow builds the installer, MSI and portable zip, signs the update, and publishes the GitHub Release with that changelog section as its notes. Installed copies see it within six hours (or at their next launch) and offer "Install now". A version with a suffix (`0.2.0-beta.1`) is published as a pre-release and only reaches people on the Beta channel.
 
 ### Testing the updater
 
