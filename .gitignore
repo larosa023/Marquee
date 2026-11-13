@@ -1,0 +1,17 @@
+node_modules/
+dist/
+target/
+src-tauri/gen/
+.env
+.env.local
+*.log
+test-results/
+playwright-report/
+coverage/
+.DS_Store
+*.marqueebackup
+
+# Test and mock builds
+dist-mock
+test-results
+playwright-report

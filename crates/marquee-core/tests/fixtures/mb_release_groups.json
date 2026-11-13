@@ -1,0 +1,7 @@
+{"release-group-count": 5, "release-group-offset": 0, "release-groups": [
+  {"id": "rg-3", "title": "Dive", "primary-type": "Album", "secondary-types": [], "first-release-date": "2011-11-08"},
+  {"id": "rg-2", "title": "Weather", "primary-type": "Album", "secondary-types": [], "first-release-date": "2019-07-12"},
+  {"id": "rg-1", "title": "Infinite Health", "primary-type": "Album", "secondary-types": [], "first-release-date": "2026"},
+  {"id": "rg-4", "title": "Simulcast (Live)", "primary-type": "Album", "secondary-types": ["Live"], "first-release-date": "2021-01-01"},
+  {"id": "rg-5", "title": "A Broadcast", "primary-type": "Broadcast", "secondary-types": [], "first-release-date": "2020-01-01"}
+]}

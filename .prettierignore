@@ -1,0 +1,7 @@
+dist
+dist-mock
+target
+src-tauri/gen
+node_modules
+playwright-report
+test-results

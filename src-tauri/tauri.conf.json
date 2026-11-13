@@ -1,0 +1,70 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Marquee",
+  "version": "0.1.1",
+  "identifier": "com.larosa023.marquee",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Marquee",
+        "width": 1360,
+        "height": 860,
+        "minWidth": 980,
+        "minHeight": 620,
+        "center": true,
+        "decorations": false,
+        "shadow": true,
+        "transparent": true,
+        "visible": false,
+        "backgroundColor": "#0A0A0C",
+        "windowEffects": { "effects": ["mica"] },
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "font-src": "'self' data:",
+        "img-src": "'self' data: blob: mqimg: http://mqimg.localhost",
+        "media-src": "'self' https:",
+        "frame-src": "https://www.youtube-nocookie.com https://open.spotify.com",
+        "connect-src": "ipc: http://ipc.localhost"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "publisher": "larosa023",
+    "category": "Entertainment",
+    "shortDescription": "New movies, shows, games and albums, picked for your taste.",
+    "longDescription": "Marquee tracks new releases across movies, TV, games and music, learns your taste from the services you already use, and lets you save anything to the right wishlist, watchlist or playlist.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "createUpdaterArtifacts": true,
+    "fileAssociations": [
+      { "ext": ["marqueetheme"], "name": "Marquee theme", "description": "Marquee theme", "role": "Editor" },
+      { "ext": ["marqueebackup"], "name": "Marquee backup", "description": "Marquee backup", "role": "Editor" }
+    ],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "allowDowngrades": true,
+      "nsis": { "installMode": "currentUser", "installerIcon": "icons/icon.ico" }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDREREEzNUIyQkIzMzg0ODMKUldTRGhETzdzalhhVGJFRldlL0ZFdXR6ZngxVWFEc2Q0YkZKZ0s2NUFjWUh0c0hyeFdvYks2VkoK",
+      "endpoints": ["https://github.com/larosa023/Marquee/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  }
+}

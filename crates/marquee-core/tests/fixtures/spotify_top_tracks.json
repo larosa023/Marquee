@@ -1,0 +1,6 @@
+{"items": [
+  {"id": "t1", "name": "Awake", "uri": "spotify:track:t1", "artists": [{"id": "ar1", "name": "Tycho"}],
+   "album": {"id": "al1", "name": "Awake", "album_type": "album", "release_date": "2014-03-18", "release_date_precision": "day", "artists": [{"id": "ar1", "name": "Tycho"}], "images": [{"url": "https://i/a640.jpg", "width": 640, "height": 640}], "external_urls": {"spotify": "https://open.spotify.com/album/al1"}}},
+  {"id": "t9", "name": "Some Hit", "uri": "spotify:track:t9", "artists": [{"id": "va", "name": "Various Artists"}],
+   "album": {"id": "comp1", "name": "Now That's What I Call Fixtures", "album_type": "compilation", "release_date": "2020", "artists": [{"id": "va", "name": "Various Artists"}], "images": []}}
+], "total": 2, "limit": 50, "offset": 0, "next": null}

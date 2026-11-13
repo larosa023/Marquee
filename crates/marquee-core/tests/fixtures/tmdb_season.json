@@ -1,0 +1,8 @@
+{
+  "season_number": 1,
+  "episodes": [
+    {"episode_number": 1, "name": "Good News About Hell", "air_date": "2022-02-17", "vote_average": 8.1, "vote_count": 120},
+    {"episode_number": 2, "name": "Half Loop", "air_date": "2022-02-17", "vote_average": 0, "vote_count": 0},
+    {"episode_number": 9, "name": "The We We Are", "air_date": "2022-04-07", "vote_average": 9.4, "vote_count": 260}
+  ]
+}

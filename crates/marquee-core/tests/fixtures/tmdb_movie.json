@@ -1,0 +1,51 @@
+{
+  "id": 329865, "imdb_id": "tt2543164", "title": "Arrival", "original_language": "en",
+  "overview": "Taking place after alien crafts land around the world, an expert linguist is recruited by the military to determine whether they come in peace or are a threat.",
+  "tagline": "Why are they here?", "release_date": "2016-09-01", "runtime": 116, "status": "Released",
+  "popularity": 48.2, "vote_average": 7.6, "vote_count": 18234,
+  "poster_path": "/x2FJsf1ElAgr63Y3PNPtJrcmpoe.jpg", "backdrop_path": "/yIZ1xendyqKvY3FGeeUYUd5X9Mm.jpg",
+  "genres": [{"id": 18, "name": "Drama"}, {"id": 878, "name": "Science Fiction"}, {"id": 9648, "name": "Mystery"}],
+  "belongs_to_collection": null,
+  "production_companies": [{"id": 1, "name": "FilmNation Entertainment"}, {"id": 2, "name": "Lava Bear Films"}, {"id": 3, "name": "21 Laps Entertainment"}],
+  "credits": {
+    "cast": [
+      {"id": 9273, "name": "Amy Adams", "character": "Louise Banks", "profile_path": "/a.jpg"},
+      {"id": 17604, "name": "Jeremy Renner", "character": "Ian Donnelly", "profile_path": "/b.jpg"},
+      {"id": 2178, "name": "Forest Whitaker", "character": "Colonel Weber", "profile_path": null}
+    ],
+    "crew": [
+      {"id": 137427, "name": "Denis Villeneuve", "job": "Director", "department": "Directing"},
+      {"id": 2, "name": "Eric Heisserer", "job": "Screenplay", "department": "Writing"},
+      {"id": 3, "name": "Jóhann Jóhannsson", "job": "Original Music Composer", "department": "Sound"},
+      {"id": 4, "name": "Bradford Young", "job": "Director of Photography", "department": "Camera"}
+    ]
+  },
+  "keywords": {"keywords": [{"id": 1, "name": "first contact"}, {"id": 2, "name": "alien contact"}, {"id": 3, "name": "linguist"}, {"id": 4, "name": "time"}, {"id": 5, "name": "melancholy"}]},
+  "videos": {"results": [
+    {"site": "YouTube", "type": "Featurette", "official": true, "key": "zzzzz", "name": "Behind the scenes"},
+    {"site": "YouTube", "type": "Trailer", "official": true, "key": "tFMo3UJ4B4g", "name": "Official Trailer"}
+  ]},
+  "watch/providers": {"results": {
+    "US": {"link": "https://www.themoviedb.org/movie/329865-arrival/watch?locale=US",
+      "flatrate": [{"provider_id": 531, "provider_name": "Paramount Plus", "logo_path": "/p.jpg"}],
+      "rent": [{"provider_id": 2, "provider_name": "Apple TV", "logo_path": "/atv.jpg"}],
+      "buy": [{"provider_id": 2, "provider_name": "Apple TV", "logo_path": "/atv.jpg"}]},
+    "GB": {"link": "x", "flatrate": [{"provider_id": 8, "provider_name": "Netflix", "logo_path": "/n.jpg"}]}
+  }},
+  "release_dates": {"results": [
+    {"iso_3166_1": "IT", "release_dates": [{"type": 1, "release_date": "2016-09-01T00:00:00.000Z", "certification": ""}]},
+    {"iso_3166_1": "US", "release_dates": [
+      {"type": 1, "release_date": "2016-09-02T00:00:00.000Z", "certification": ""},
+      {"type": 3, "release_date": "2016-11-11T00:00:00.000Z", "certification": "PG-13"},
+      {"type": 4, "release_date": "2017-01-31T00:00:00.000Z", "certification": "PG-13"}
+    ]}
+  ]},
+  "images": {"backdrops": [{"file_path": "/g1.jpg"}, {"file_path": "/g2.jpg"}]},
+  "recommendations": {"results": [
+    {"id": 335984, "title": "Blade Runner 2049", "release_date": "2017-10-04", "poster_path": "/br.jpg", "genre_ids": [878, 18], "popularity": 60.1, "vote_average": 7.6, "vote_count": 14000},
+    {"id": 264660, "title": "Ex Machina", "release_date": "2015-01-21", "poster_path": "/ex.jpg", "genre_ids": [18, 878], "popularity": 30.4, "vote_average": 7.6, "vote_count": 13000}
+  ]},
+  "similar": {"results": [
+    {"id": 335984, "title": "Blade Runner 2049", "release_date": "2017-10-04", "poster_path": "/br.jpg", "genre_ids": [878, 18], "popularity": 60.1, "vote_average": 7.6, "vote_count": 14000}
+  ]}
+}

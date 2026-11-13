@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "id": "marquee",
+  "name": "Marquee",
+  "version": "0.1.1",
+  "description": "New movies, shows, games and albums, picked for your taste.",
+  "category": "media",
+  "repo": "larosa023/Marquee",
+  "icon": "https://raw.githubusercontent.com/larosa023/Marquee/main/src-tauri/icons/icon.png",
+  "exe": "Marquee.exe",
+  "releaseFeed": "https://github.com/larosa023/Marquee/releases/latest/download/latest.json",
+  "install": {
+    "type": "nsis",
+    "asset": "Marquee_*_x64-setup.exe",
+    "registry": "Marquee",
+    "command": "Marquee_{version}_x64-setup.exe /S",
+    "uninstall": "\"%LOCALAPPDATA%\\Marquee\\uninstall.exe\" /S",
+    "dataDir": "%LOCALAPPDATA%\\com.larosa023.marquee\\data"
+  },
+  "args": {
+    "quit": "--quit",
+    "minimized": "--minimized",
+    "backup": "--backup \"{file}\"",
+    "restore": "--restore \"{file}\""
+  },
+  "ipc": {
+    "protocol": 1,
+    "pipe": "\\\\.\\pipe\\larosa023.marquee.{sessionId}",
+    "runFile": "%LOCALAPPDATA%\\Hangar\\run\\marquee.json",
+    "capabilities": ["state", "theme", "settings", "backup", "update"]
+  },
+  "liveUpdate": true,
+  "themes": true,
+  "backup": {
+    "extension": "marqueebackup",
+    "includesSecrets": false
+  },
+  "hangarManifestEntry": {
+    "id": "marquee",
+    "name": "Marquee",
+    "repo": "larosa023/Marquee",
+    "description": "New movies, shows, games and albums, picked for your taste.",
+    "category": "media",
+    "icon": "https://raw.githubusercontent.com/larosa023/Marquee/main/src-tauri/icons/icon.png",
+    "exe": "Marquee.exe",
+    "install": { "type": "nsis", "asset": "Marquee_*_x64-setup.exe", "registry": "Marquee" },
+    "args": { "quit": "--quit" },
+    "liveUpdate": true
+  }
+}

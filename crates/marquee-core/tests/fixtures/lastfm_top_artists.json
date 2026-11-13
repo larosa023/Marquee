@@ -1,0 +1,4 @@
+{"topartists": {"artist": [
+  {"name": "Tycho", "mbid": "mbid-artist", "playcount": "1842", "url": "https://www.last.fm/music/Tycho", "@attr": {"rank": "1"}},
+  {"name": "Boards of Canada", "mbid": "", "playcount": "960", "url": "https://www.last.fm/music/Boards+of+Canada", "@attr": {"rank": "2"}}
+], "@attr": {"user": "anthony", "totalPages": "1", "page": "1", "perPage": "50", "total": "2"}}}

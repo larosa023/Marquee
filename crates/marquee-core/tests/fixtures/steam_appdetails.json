@@ -1,0 +1,16 @@
+{"753640": {"success": true, "data": {
+  "type": "game", "name": "Outer Wilds", "steam_appid": 753640, "is_free": false,
+  "short_description": "Named Game of the Year 2019 by Giant Bomb, Polygon, Eurogamer, and The Guardian, Outer Wilds is a critically-acclaimed and award-winning open world mystery.",
+  "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/753640/header.jpg",
+  "background_raw": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/753640/page_bg_raw.jpg",
+  "developers": ["Mobius Digital"], "publishers": ["Annapurna Interactive"],
+  "price_overview": {"currency": "USD", "initial": 2499, "final": 1499, "discount_percent": 40, "initial_formatted": "$24.99", "final_formatted": "$14.99"},
+  "platforms": {"windows": true, "mac": false, "linux": false},
+  "metacritic": {"score": 85},
+  "categories": [{"id": 2, "description": "Single-player"}, {"id": 22, "description": "Steam Achievements"}],
+  "genres": [{"id": "1", "description": "Action"}, {"id": "25", "description": "Adventure"}],
+  "screenshots": [{"id": 0, "path_thumbnail": "https://x/ss0.600x338.jpg", "path_full": "https://x/ss0.1920x1080.jpg"}],
+  "movies": [{"id": 1, "name": "Launch Trailer", "thumbnail": "https://x/movie.jpg", "webm": {"480": "https://x/movie480.webm", "max": "https://x/movie_max.webm"}, "mp4": {"480": "https://x/movie480.mp4", "max": "https://x/movie_max.mp4"}}],
+  "recommendations": {"total": 81234},
+  "release_date": {"coming_soon": false, "date": "Jun 18, 2020"}
+}}}
