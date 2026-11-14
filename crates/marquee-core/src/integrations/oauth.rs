@@ -5,9 +5,44 @@ use base64::Engine;
 use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
+use tokio::sync::Notify;
+
+/// The sign-in currently waiting on each port. Starting another one (say, a retry after the
+/// first attempt hit an error page) takes the port over instead of failing with "port in use".
+static WAITING: Mutex<Vec<(u16, Arc<Notify>)>> = Mutex::new(Vec::new());
+
+/// Binds the port, first asking an earlier sign-in of ours to let go of it.
+async fn take_port(port: u16) -> Result<(TcpListener, Arc<Notify>)> {
+    let me = Arc::new(Notify::new());
+    {
+        let mut waiting = WAITING.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(i) = waiting.iter().position(|(p, _)| *p == port) {
+            waiting.remove(i).1.notify_one();
+        }
+        waiting.push((port, me.clone()));
+    }
+    let mut last = None;
+    // The earlier listener closes within a moment of being told to.
+    for _ in 0..40 {
+        match TcpListener::bind(("127.0.0.1", port)).await {
+            Ok(l) => return Ok((l, me)),
+            Err(e) => last = Some(e),
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    release(port, &me);
+    let e = last.map(|e| e.to_string()).unwrap_or_default();
+    Err(Error::msg(format!("Couldn't listen on 127.0.0.1:{port} for the sign-in: another program is using that port ({e}). Close it, or quit any other copy of Marquee, and try again.")))
+}
+
+fn release(port: u16, me: &Arc<Notify>) {
+    let mut waiting = WAITING.lock().unwrap_or_else(|e| e.into_inner());
+    waiting.retain(|(p, n)| !(*p == port && Arc::ptr_eq(n, me)));
+}
 
 /// The loopback port Marquee listens on during a sign-in. Redirect URIs registered with
 /// Spotify must use exactly this port.
@@ -49,7 +84,7 @@ pub fn parse_query(q: &str) -> HashMap<String, String> {
 /// Waits for the browser to land on `http://127.0.0.1:<port><path>?...` and returns the query
 /// parameters. Other requests (favicons and the like) get a 404 and are ignored.
 pub async fn wait_for_redirect(port: u16, path: &str, timeout: Duration) -> Result<HashMap<String, String>> {
-    let listener = TcpListener::bind(("127.0.0.1", port)).await.map_err(|e| Error::msg(format!("Couldn't listen on 127.0.0.1:{port} for the sign-in ({e}). Close whatever is using that port and try again.")))?;
+    let (listener, me) = take_port(port).await?;
     let accept = async {
         loop {
             let (mut sock, _) = listener.accept().await?;
@@ -73,11 +108,17 @@ pub async fn wait_for_redirect(port: u16, path: &str, timeout: Duration) -> Resu
             return Ok::<_, std::io::Error>(params);
         }
     };
-    match tokio::time::timeout(timeout, accept).await {
-        Ok(Ok(params)) => Ok(params),
-        Ok(Err(e)) => Err(Error::Io(e)),
-        Err(_) => Err(Error::msg("The sign-in wasn't finished in time. Try connecting again.")),
-    }
+    let outcome = tokio::select! {
+        r = tokio::time::timeout(timeout, accept) => match r {
+            Ok(Ok(params)) => Ok(params),
+            Ok(Err(e)) => Err(Error::Io(e)),
+            Err(_) => Err(Error::msg("The sign-in wasn't finished in time. Try connecting again.")),
+        },
+        _ = me.notified() => Err(Error::msg("A newer sign-in replaced this one.")),
+    };
+    release(port, &me);
+    drop(listener);
+    outcome
 }
 
 #[cfg(test)]
@@ -115,5 +156,21 @@ mod tests {
         let params = wait.await.unwrap().unwrap();
         assert_eq!(params["code"], "the-code");
         assert_eq!(params["state"], "s1");
+    }
+
+    #[tokio::test]
+    async fn starting_a_second_sign_in_takes_over_the_port_from_the_first() {
+        let port = 44600 + (std::process::id() % 300) as u16;
+        let first = tokio::spawn(wait_for_redirect(port, "/spotify", Duration::from_secs(30)));
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        let second = tokio::spawn(wait_for_redirect(port, "/spotify", Duration::from_secs(5)));
+        let replaced = first.await.unwrap().unwrap_err().to_string();
+        assert!(replaced.contains("newer sign-in"), "{replaced}");
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        let mut s = tokio::net::TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        s.write_all(b"GET /spotify?code=c2 HTTP/1.1\r\nHost: x\r\n\r\n").await.unwrap();
+        let mut out = String::new();
+        let _ = s.read_to_string(&mut out).await;
+        assert_eq!(second.await.unwrap().unwrap()["code"], "c2");
     }
 }

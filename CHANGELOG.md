@@ -2,6 +2,11 @@
 
 All notable changes to Marquee are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.1.7
+
+### Fixed
+- Signing in to Spotify (or MyAnimeList) a second time no longer fails with "Couldn't listen on 127.0.0.1:43117… os error 10048". The first attempt kept the sign-in port open for up to five minutes, waiting for a redirect that never came (for example after Spotify showed an error page). A new attempt now takes the port over from the old one, and the replaced attempt no longer reports an error.
+
 ## 0.1.6
 
 ### Smoother browsing

@@ -155,7 +155,10 @@ function ConnectModal({ source, onClose }: { source: SourceStatus; onClose: () =
     };
   }, [source.id]);
 
+  // Only the latest attempt reports back: clicking "Sign in" again replaces the earlier one.
+  const attempt = useRef(0);
   const run = async (label: string, call: () => Promise<{ account?: string | null }>, close = true) => {
+    const mine = ++attempt.current;
     setBusy(label);
     setError(null);
     try {
@@ -164,10 +167,13 @@ function ConnectModal({ source, onClose }: { source: SourceStatus; onClose: () =
       await after(source.id, source.name, out.account);
       if (close && live.current) onClose();
     } catch (e) {
-      if (live.current) setError(errorMessage(e));
-      else toast(errorMessage(e), 'bad');
+      const msg = errorMessage(e);
+      if (msg.startsWith('A newer sign-in replaced')) return;
+      if (mine !== attempt.current) return;
+      if (live.current) setError(msg);
+      else toast(msg, 'bad');
     }
-    if (live.current) setBusy(null);
+    if (live.current && mine === attempt.current) setBusy(null);
   };
 
   let body: ReactNode = null;
