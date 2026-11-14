@@ -18,6 +18,21 @@ const VISIBLE: &str = "i.media != 'artist' AND s.item_id IS NOT NULL";
 /// A game on sale at, or within 10% of, the lowest price on record (see `notifications::near_low`).
 const NEAR_LOW: &str = "COALESCE(json_extract(i.data, '$.discount'), 0) > 0 AND json_extract(i.data, '$.low.cents') IS NOT NULL AND json_extract(i.data, '$.price.cents') <= json_extract(i.data, '$.low.cents') * 1.1";
 
+/// Anime (series and films): anything from MyAnimeList, or animated and Japanese (or tagged anime).
+/// Kept as a flag on each item by `mark_anime`, so the hubs can filter on it cheaply.
+const ANIME_RULE: &str = "(EXISTS (SELECT 1 FROM item_ids x WHERE x.item_id = items.id AND x.source = 'mal')
+    OR (EXISTS (SELECT 1 FROM item_features g WHERE g.item_id = items.id AND g.feature = 'g:animation')
+        AND (json_extract(items.data, '$.language') = 'ja' OR EXISTS (SELECT 1 FROM item_features l WHERE l.item_id = items.id AND l.feature = 'l:ja') OR EXISTS (SELECT 1 FROM item_features t WHERE t.item_id = items.id AND t.feature = 't:anime'))))";
+pub const IS_ANIME: &str = "json_extract(i.data, '$.anime') = 1";
+
+/// Refreshes every show's and film's anime flag. Only rows whose flag changes are written.
+pub fn mark_anime(conn: &rusqlite::Connection) -> Result<usize> {
+    Ok(conn.execute(
+        &format!("UPDATE items SET data = json_set(data, '$.anime', json(CASE WHEN {ANIME_RULE} THEN 'true' ELSE 'false' END)) WHERE media IN ('tv', 'movie') AND COALESCE(json_extract(data, '$.anime'), -1) != (CASE WHEN {ANIME_RULE} THEN 1 ELSE 0 END)"),
+        [],
+    )?)
+}
+
 const NOT_DONE: &str = "NOT EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind IN ('watched', 'play', 'rating', 'owned'))";
 
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -33,6 +48,8 @@ pub struct Filters {
     /// Only titles streaming on a service the user subscribes to.
     pub my_services: bool,
     pub on_sale: bool,
+    /// "only" (the Anime screen), "exclude" (TV), or anything else for both.
+    pub anime: String,
     /// Only games at or near their lowest price on record.
     pub near_low: bool,
     /// Cents.
@@ -62,6 +79,11 @@ fn where_clause(ctx: &Ctx, f: &Filters) -> (String, Vec<Sql>) {
     if !media.is_empty() {
         sql.push(format!("i.media IN ({})", in_list(media.len())));
         args.extend(media.iter().map(|m| Sql::Text(Media::parse(m).map(|m| m.as_str()).unwrap_or("movie").to_string())));
+    }
+    match f.anime.as_str() {
+        "only" => sql.push(IS_ANIME.into()),
+        "exclude" => sql.push(format!("NOT COALESCE({IS_ANIME}, 0)")),
+        _ => {}
     }
     if !f.genres.is_empty() {
         sql.push(format!("EXISTS (SELECT 1 FROM item_features x WHERE x.item_id = i.id AND x.feature IN ({}))", in_list(f.genres.len())));
@@ -318,13 +340,31 @@ pub fn for_you(ctx: &Ctx, f: &Filters, offset: usize, limit: usize) -> Result<Va
 }
 
 /// A media hub: new and upcoming for one medium, filtered and sorted.
-pub fn hub(ctx: &Ctx, media: Media, f: &Filters, offset: usize, limit: usize) -> Result<Value> {
+/// A hub screen. `section` is a medium, or "anime" for anime series and films together.
+pub fn hub(ctx: &Ctx, section: &str, f: &Filters, offset: usize, limit: usize) -> Result<Value> {
     let mut f = f.clone();
-    f.media = vec![media.as_str().to_string()];
+    let anime = section == "anime";
+    let media = if anime { Media::Tv } else { Media::parse(section).ok_or_else(|| crate::error::Error::msg("Unknown media type."))? };
+    if anime {
+        if f.media.is_empty() {
+            f.media = vec!["tv".into(), "movie".into()];
+        }
+        f.anime = "only".into();
+    } else {
+        f.media = vec![media.as_str().to_string()];
+        if media == Media::Tv {
+            // Anime has its own screen.
+            f.anime = "exclude".into();
+        }
+    }
     let (mut w, mut args) = where_clause(ctx, &f);
     if f.status.is_empty() || f.status == "all" {
         // "New + upcoming": nothing older than four months unless the user asks for released titles.
-        w.push_str(" AND (i.release_date >= ? OR i.release_date IS NULL)");
+        // A returning show counts from its new season's premiere, not its first-ever episode.
+        // Undated titles only when a catalog has confirmed them as "TBA": an album or film from
+        // your history that simply lacks a date isn't new.
+        w.push_str(" AND (i.release_date >= ? OR (i.release_date IS NULL AND i.media != 'album' AND i.detail_level >= 1) OR json_extract(i.data, '$.season_start') >= ?)");
+        args.push(Sql::Text(days_from_today(-120)));
         args.push(Sql::Text(days_from_today(-120)));
     }
     let sort = if f.sort.is_empty() { "match" } else { f.sort.as_str() };
@@ -334,11 +374,16 @@ pub fn hub(ctx: &Ctx, media: Media, f: &Filters, offset: usize, limit: usize) ->
 
     // Facets for the filter bar.
     let conn = ctx.db.lock();
-    let mut stmt = conn.prepare(
+    let scope = match (anime, media) {
+        (true, _) => format!("i.media IN ('tv', 'movie') AND {IS_ANIME}"),
+        (false, Media::Tv) => format!("i.media = 'tv' AND NOT COALESCE({IS_ANIME}, 0)"),
+        (false, m) => format!("i.media = '{}'", m.as_str()),
+    };
+    let mut stmt = conn.prepare(&format!(
         "SELECT substr(x.feature, 3), count(*) FROM item_features x JOIN items i ON i.id = x.item_id
-         WHERE i.media = ?1 AND x.feature LIKE 'g:%' GROUP BY x.feature ORDER BY count(*) DESC LIMIT 18",
-    )?;
-    let genres: Vec<Value> = stmt.query_map([media.as_str()], |r| Ok(json!({ "id": r.get::<_, String>(0)?, "count": r.get::<_, i64>(1)? })))?.collect::<rusqlite::Result<_>>()?;
+         WHERE {scope} AND x.feature LIKE 'g:%' AND x.feature != 'g:animation' GROUP BY x.feature ORDER BY count(*) DESC LIMIT 18"
+    ))?;
+    let genres: Vec<Value> = stmt.query_map([], |r| Ok(json!({ "id": r.get::<_, String>(0)?, "count": r.get::<_, i64>(1)? })))?.collect::<rusqlite::Result<_>>()?;
     let platforms: Vec<String> = if media == Media::Game {
         let mut stmt = conn.prepare("SELECT p.value, count(*) FROM items i, json_each(i.data, '$.platforms') p WHERE i.media = 'game' GROUP BY p.value ORDER BY count(*) DESC LIMIT 12")?;
         let rows = stmt.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
@@ -350,13 +395,16 @@ pub fn hub(ctx: &Ctx, media: Media, f: &Filters, offset: usize, limit: usize) ->
 }
 
 /// TV: the shows being tracked, with a countdown to the next episode.
-pub fn tracked_shows(ctx: &Ctx) -> Result<Vec<Value>> {
+pub fn tracked_shows(ctx: &Ctx, anime: bool) -> Result<Vec<Value>> {
     let conn = ctx.db.lock();
+    let which = if anime { IS_ANIME.to_string() } else { format!("NOT COALESCE({IS_ANIME}, 0)") };
     let list = cards(
         &conn,
-        "WHERE i.media = 'tv' AND (EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind IN ('watched', 'rating', 'like', 'play'))
+        &format!(
+            "WHERE i.media = 'tv' AND {which} AND (EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind IN ('watched', 'rating', 'like', 'play'))
             OR EXISTS (SELECT 1 FROM list_items l WHERE l.item_id = i.id) OR EXISTS (SELECT 1 FROM follows fo WHERE fo.item_id = i.id))
-         ORDER BY json_extract(i.data, '$.next_episode.air_date') IS NULL, json_extract(i.data, '$.next_episode.air_date') ASC, i.popularity DESC LIMIT 80",
+         ORDER BY json_extract(i.data, '$.next_episode.air_date') IS NULL, json_extract(i.data, '$.next_episode.air_date') ASC, i.popularity DESC LIMIT 80"
+        ),
         &[],
     )?;
     let today = chrono::Local::now().date_naive();
@@ -677,10 +725,12 @@ pub async fn episodes(ctx: &Ctx, item_id: i64) -> Result<Value> {
         },
         _ => vec![],
     };
+    // Without TMDB, TVmaze's episode list (stored with the show's details) stands in.
+    let (base, base_source) = if tmdb_seasons.is_empty() && item.data["tvmaze_episodes"].is_array() { (catalog::tvmaze::heatmap(&item.data), "TVmaze") } else { (tmdb_seasons, "TMDB") };
     let imdb = if catalog::imdb::enabled(ctx) { item.ext("imdb").and_then(|id| catalog::imdb::show(&ctx.data_dir, id)) } else { None };
     let (seasons, source, show_rating) = match imdb {
-        Some((eps, show_rating)) if !eps.is_empty() => (merge_imdb(&tmdb_seasons, &eps), "IMDb", show_rating),
-        other => (tmdb_seasons, "TMDB", other.and_then(|o| o.1)),
+        Some((eps, show_rating)) if !eps.is_empty() => (merge_imdb(&base, &eps), "IMDb", show_rating),
+        other => (base, base_source, other.and_then(|o| o.1)),
     };
     let rated: Vec<f64> = seasons.iter().flatten().filter_map(|e| e.rating).collect();
     let avg = if rated.is_empty() { None } else { Some((rated.iter().sum::<f64>() / rated.len() as f64 * 10.0).round() / 10.0) };
@@ -689,7 +739,11 @@ pub async fn episodes(ctx: &Ctx, item_id: i64) -> Result<Value> {
         "average": avg,
         "source": source,
         "imdb": show_rating.map(|(rating, votes)| json!({ "rating": rating, "votes": votes, "url": item.ext("imdb").map(|id| format!("https://www.imdb.com/title/{id}/")) })),
-        "attribution": if source == "IMDb" { Some(catalog::imdb::ATTRIBUTION) } else { None },
+        "attribution": match source {
+            "IMDb" => Some(catalog::imdb::ATTRIBUTION),
+            "TVmaze" => Some(catalog::tvmaze::ATTRIBUTION),
+            _ => None,
+        },
     }))
 }
 
@@ -1105,15 +1159,46 @@ mod tests {
     }
 
     #[test]
+    fn anime_has_its_own_screen_and_stays_off_tv() {
+        let (t, _) = world();
+        let (anime, show) = {
+            let conn = t.ctx.db.lock();
+            let mut a = ItemDraft::new(Media::Tv, "Frieren").id("mal", 52991);
+            a.release_date = Some(days_from_today(3));
+            a.genres = vec!["Animation".into()];
+            let anime = store::upsert_item(&conn, &a).unwrap();
+            let mut j = ItemDraft::new(Media::Tv, "Dandadan").id("tmdb", 777);
+            j.release_date = Some(days_from_today(5));
+            j.genres = vec!["Animation".into()];
+            j.language = Some("ja".into());
+            let jp = store::upsert_item(&conn, &j).unwrap();
+            let mut w = ItemDraft::new(Media::Tv, "Arcane").id("tmdb", 778);
+            w.release_date = Some(days_from_today(4));
+            w.genres = vec!["Animation".into()];
+            w.language = Some("en".into());
+            store::upsert_item(&conn, &w).unwrap();
+            (vec![anime, jp], "Arcane")
+        };
+        crate::sync::rescore(&t.ctx).unwrap();
+        let ids = |v: &Value| v["cards"].as_array().unwrap().iter().map(|c| (c["id"].as_i64().unwrap(), c["title"].as_str().unwrap().to_string())).collect::<Vec<_>>();
+        let tv = ids(&hub(&t.ctx, "tv", &Filters::default(), 0, 100).unwrap());
+        assert!(tv.iter().all(|(id, _)| !anime.contains(id)), "anime isn't on TV: {tv:?}");
+        assert!(tv.iter().any(|(_, title)| title == show), "western animation stays on TV");
+        let a = ids(&hub(&t.ctx, "anime", &Filters::default(), 0, 100).unwrap());
+        assert_eq!(a.iter().map(|x| x.0).collect::<Vec<_>>().len(), 2);
+        assert!(anime.iter().all(|id| a.iter().any(|x| x.0 == *id)));
+    }
+
+    #[test]
     fn hubs_show_new_and_upcoming_with_facets() {
         let (t, ids) = world();
-        let movies = hub(&t.ctx, Media::Movie, &Filters { sort: "date".into(), ..Default::default() }, 0, 50).unwrap();
+        let movies = hub(&t.ctx, "movie", &Filters { sort: "date".into(), ..Default::default() }, 0, 50).unwrap();
         let listed: Vec<i64> = movies["cards"].as_array().unwrap().iter().map(|c| c["id"].as_i64().unwrap()).collect();
         assert!(listed.contains(&ids["scifi_film"]) && !listed.contains(&ids["old"]), "nothing older than four months by default");
         assert!(movies["genres"].as_array().unwrap().iter().any(|g| g["id"] == "sci-fi"));
-        let games = hub(&t.ctx, Media::Game, &Filters::default(), 0, 50).unwrap();
+        let games = hub(&t.ctx, "game", &Filters::default(), 0, 50).unwrap();
         assert!(games["platforms"].as_array().unwrap().contains(&json!("PS5")));
-        let old = hub(&t.ctx, Media::Movie, &Filters { status: "released".into(), ..Default::default() }, 0, 50).unwrap();
+        let old = hub(&t.ctx, "movie", &Filters { status: "released".into(), ..Default::default() }, 0, 50).unwrap();
         assert!(old["cards"].as_array().unwrap().iter().any(|c| c["id"] == ids["old"]));
     }
 

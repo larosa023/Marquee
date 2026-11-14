@@ -7,6 +7,7 @@ pub mod lastfm;
 pub mod musicbrainz;
 pub mod steam_store;
 pub mod tmdb;
+pub mod tvmaze;
 
 use crate::ctx::Ctx;
 use crate::error::{Error, Result};
@@ -118,6 +119,20 @@ pub async fn ensure_detail(ctx: &Ctx, item_id: i64) -> Result<()> {
 }
 
 async fn movie_or_show(ctx: &Ctx, item: &Item) -> Result<Option<ItemDraft>> {
+    // Without a TMDB key, shows still get details, posters and episodes from TVmaze (no key).
+    if item.media == Media::Tv && !ctx.has_key("tmdb") {
+        if item.data["mal_sequel"] == true {
+            return Ok(None);
+        }
+        let id = match item.ext("tvmaze") {
+            Some(id) => Some(id.to_string()),
+            None => tvmaze::find(ctx, item.ext("imdb"), item.ext("tvdb"), &item.title, item.year).await?,
+        };
+        return match id {
+            Some(id) => Ok(Some(tvmaze::details(ctx, &id).await?)),
+            None => Ok(None),
+        };
+    }
     // Not "no match": the caller must know to try again once the key is added.
     ctx.require_key("tmdb")?;
     // A MyAnimeList sequel season ("... Season 2") is news as itself. Matching it to its show on
@@ -361,7 +376,12 @@ pub async fn refresh(ctx: &Ctx, progress: &(dyn Fn(&str, f64) + Send + Sync)) ->
             }
         }
     } else {
-        report.skipped.push("Movies and TV need a TMDB key (Settings → Connections → API keys).".into());
+        report.skipped.push("Movies need a TMDB key (Settings → Connections → API keys). TV comes from TVmaze until then.".into());
+        progress("Checking new shows", 0.2);
+        match tvmaze::premieres(ctx, -14, 30).await {
+            Ok(list) => report.shows += save_all(ctx, &list).map(|v| v.len()).unwrap_or(0),
+            Err(e) => offline |= note(&mut report, "TV", e),
+        }
     }
 
     if ctx.has_key("mal_client_id") {

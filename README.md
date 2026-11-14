@@ -30,6 +30,8 @@ _Screenshots go here once the first release is installed. Suggested set: Home, a
 - **Marquee Wrapped**: your year in review across movies, shows, games and music, shareable as an image.
 - **Surprise me**: roll a random movie, show, game or album you'd probably like.
 - **Search** across everything, and **vibe search** ("a short cozy game for a rainy Sunday").
+- **TV that works with no setup**: premieres, new seasons, posters, next episodes and episode ratings from TVmaze, no key needed (TMDB adds trailers and where-to-watch when you add its key).
+- **Anime gets its own screen**, separate from TV: this season's and next season's anime, series and films, and the anime you're watching.
 - **Anime from MyAnimeList**: your list, scores and Plan to Watch feed your taste, each season's new anime shows up in the feeds, and you can add, complete and score anime from Marquee.
 - **IMDb episode ratings**, the same numbers SeriesGraph charts, in every show's episode heatmap.
 - **Optional local AI** through [Ollama](https://ollama.com): natural-language vibe search, written blurbs, local embeddings.
@@ -49,7 +51,7 @@ Marquee talks to each service directly from your PC, and each service wants a ke
 
 | Key | Used for | Where to get it | Notes |
 |---|---|---|---|
-| `TMDB_API_KEY` | Movies and TV | [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) | Free. Use the "API Key (v3 auth)" value. |
+| `TMDB_API_KEY` | Movies (and richer TV) | [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) | Free. Use the "API Key (v3 auth)" value. |
 | `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET` | Games | [dev.twitch.tv/console/apps](https://dev.twitch.tv/console/apps) | Register an app (category "Application Integration", any redirect URL such as `http://localhost`), then create a client secret. Your Twitch account needs two-factor sign-in turned on. |
 | `LASTFM_API_KEY`, `LASTFM_API_SECRET` | Music recommendations, scrobbles | [last.fm/api/account/create](https://www.last.fm/api/account/create) | Free. No callback URL needed. |
 | `SPOTIFY_CLIENT_ID` | Spotify sign-in | [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) | Redirect URI: `http://127.0.0.1:43117/spotify`. Tick "Web API". No client secret is used. See the Spotify note in KNOWN_LIMITATIONS.md. |
@@ -58,7 +60,7 @@ Marquee talks to each service directly from your PC, and each service wants a ke
 | `MAL_CLIENT_ID` | Your MyAnimeList list and each season's new anime | [myanimelist.net/apiconfig](https://myanimelist.net/apiconfig) | Click "Create ID". App Type: **other**. App Redirect URL: `http://127.0.0.1:43117/mal`. Homepage URL: `https://github.com/larosa023/Marquee`. Fill in the rest however you like. An "other" app has no secret; `MAL_CLIENT_SECRET` is only for a "web" app. |
 | `ITAD_API_KEY` | All-time low game prices (optional) | [isthereanydeal.com/apps/my](https://isthereanydeal.com/apps/my/) | Without it Marquee shows the lowest price it has seen itself. |
 
-Movies and TV need TMDB, games need IGDB, and music needs Last.fm. A missing key only switches off what depends on it; the screen says which key to add.
+Movies need TMDB, games need IGDB, and music needs Last.fm. TV works with no key at all (from TVmaze), and switches to TMDB's richer data once a TMDB key is added. A missing key only switches off what depends on it; the screen says which key to add.
 
 Keys built into a release are inside the installer and can be extracted by anyone determined to. That is normal for desktop apps, and all of these are low-privilege app identifiers, but if you'd rather not ship yours, leave the GitHub secrets empty and enter the keys in Settings on your own PC instead.
 

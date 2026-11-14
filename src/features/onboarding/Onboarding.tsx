@@ -154,7 +154,7 @@ function Love({ picked, setPicked }: { picked: Set<number>; setPicked: (s: Set<n
           {picked.size} picked{picked.size >= 10 ? ' · plenty to go on' : picked.size > 0 ? ` · ${10 - picked.size} more would be ideal` : ''}
         </span>
       </div>
-      {data && data.missing.length > 0 && <p className="mb-3 text-[12px] text-faint">Not shown because a key is missing: {data.missing.map((m) => ({ tmdb: 'movies and TV', igdb: 'games', lastfm: 'music' })[m] ?? m).join(', ')}.</p>}
+      {data && data.missing.length > 0 && <p className="mb-3 text-[12px] text-faint">Not shown because a key is missing: {data.missing.map((m) => ({ tmdb: 'movies', igdb: 'games', lastfm: 'music' })[m] ?? m).join(', ')}.</p>}
       <ul className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(112px, 1fr))' }}>
         {cards.map((c) => {
           const on = picked.has(c.id);

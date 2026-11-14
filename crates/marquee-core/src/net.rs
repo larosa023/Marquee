@@ -113,6 +113,8 @@ fn limit_for(host: &str) -> (f64, f64) {
         // Artwork CDNs: a screen of posters loads at once.
         "image.tmdb.org" | "images.igdb.com" | "i.scdn.co" | "lastfm.freetls.fastly.net" | "i.ytimg.com" | "cdn.myanimelist.net" => (150.0, 200.0), // CDNs: no published limit
         "api.myanimelist.net" => (2.0, 4.0),
+        "api.tvmaze.com" => (1.8, 10.0), // 20 calls per 10 seconds
+        "static.tvmaze.com" => (150.0, 200.0),
         "datasets.imdbws.com" => (2.0, 2.0),
         h if h.ends_with("steamstatic.com") => (150.0, 200.0),
         "archive.org" => (6.0, 12.0),

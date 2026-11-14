@@ -1,4 +1,5 @@
-// The media hubs (Movies, TV, Games, Music): new and upcoming for one medium, filtered and sorted.
+// The media hubs (Movies, TV, Anime, Games, Music): new and upcoming for one medium, filtered and sorted.
+// Anime has its own screen (series and films), and TV leaves it out.
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
@@ -11,7 +12,7 @@ import { CardGrid, GridSkeleton } from '@/ui/Card';
 import { useCardMenu } from '@/ui/CardMenu';
 import { FilterBar, activeFilterCount } from '@/ui/Filters';
 import { Icon } from '@/ui/icons';
-import { Button, EmptyState, ErrorState, OfflineBanner, PageHeader, SectionTitle } from '@/ui/primitives';
+import { Button, EmptyState, ErrorState, OfflineBanner, PageHeader, SectionTitle, Segmented } from '@/ui/primitives';
 
 interface Page {
   cards: Card[];
@@ -20,23 +21,26 @@ interface Page {
   platforms: string[];
 }
 
-const COPY: Record<Media, { title: string; subtitle: string; key: string; keyHint: string }> = {
+type Section = Media | 'anime';
+
+const COPY: Record<Section, { title: string; subtitle: string; key: string | null; keyHint: string }> = {
   movie: { title: 'Movies', subtitle: 'In theaters, on streaming, and on the way', key: 'tmdb', keyHint: 'Movies come from TMDB. Add a TMDB key to fill this page.' },
-  tv: { title: 'TV', subtitle: 'Premieres, new seasons and the shows you follow', key: 'tmdb', keyHint: 'Shows come from TMDB. Add a TMDB key to fill this page.' },
+  tv: { title: 'TV', subtitle: 'Premieres, new seasons and the shows you follow', key: null, keyHint: 'Shows come from TVmaze (no key needed) or TMDB. Sync to fetch what’s premiering.' },
+  anime: { title: 'Anime', subtitle: 'This season, next season and the anime you follow', key: 'mal_client_id', keyHint: 'Seasonal anime comes from MyAnimeList. Connect MyAnimeList in Connections, or add a TMDB key for anime from TMDB.' },
   game: { title: 'Games', subtitle: 'New and upcoming, with prices and Deck status', key: 'igdb_client_id', keyHint: 'The games catalog comes from IGDB. Add a Twitch client ID and secret to fill this page.' },
   album: { title: 'Music', subtitle: 'New albums, EPs and singles from artists you follow and artists like them', key: 'lastfm_key', keyHint: 'New music is found through the artists you listen to. Connect Last.fm or Spotify, and add a Last.fm key for similar artists.' },
 };
 
 /** The shows being tracked, soonest episode first, with a countdown. */
-function Tracking() {
+function Tracking({ anime }: { anime: boolean }) {
   const openItem = useApp((s) => s.openItem);
-  const { data } = useQuery({ queryKey: ['tracked'], queryFn: () => api<{ card: Card; next_episode: any; days: number | null }[]>('tracked_shows') });
+  const { data } = useQuery({ queryKey: ['tracked', anime], queryFn: () => api<{ card: Card; next_episode: any; days: number | null }[]>('tracked_shows', { anime }) });
   if (!data || data.length === 0) return null;
   const upcoming = data.filter((d) => d.days != null && d.days >= 0);
   const list = (upcoming.length ? upcoming : data).slice(0, 12);
   return (
-    <section className="mb-9 px-(--pad)" aria-label="Shows you're watching">
-      <SectionTitle hint={`${data.length} tracked`}>Shows you're watching</SectionTitle>
+    <section className="mb-9 px-(--pad)" aria-label={anime ? "Anime you're watching" : "Shows you're watching"}>
+      <SectionTitle hint={`${data.length} tracked`}>{anime ? "Anime you're watching" : "Shows you're watching"}</SectionTitle>
       <motion.ul initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: 0.03 } } }} className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
         {list.map(({ card, next_episode: ep, days }) => (
           <motion.li key={card.id} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
@@ -74,12 +78,19 @@ function Tracking() {
   );
 }
 
-export default function Hub({ media }: { media: Media }) {
-  const [filters, setFilters] = useState<Filters>({});
+/** Each screen's filters, kept while the app is open so leaving and coming back doesn't reset them. */
+const remembered = new Map<Section, Filters>();
+
+export default function Hub({ media }: { media: Section }) {
+  const [filters, setFiltersState] = useState<Filters>(() => remembered.get(media) ?? {});
+  const setFilters = (f: Filters) => {
+    remembered.set(media, f);
+    setFiltersState(f);
+  };
   const copy = COPY[media];
   const offline = useApp((s) => s.offline);
   const navigate = useApp((s) => s.navigate);
-  const keySet = useApp((s) => s.boot?.keys.find((k) => k.name === copy.key)?.set ?? false);
+  const keySet = useApp((s) => copy.key == null || (s.boot?.keys.find((k) => k.name === copy.key)?.set ?? false));
   const hasServices = useApp((s) => setting<number[]>(s.boot?.settings, 'my_providers', []).length > 0);
   const menu = useCardMenu();
   const q = useInfiniteQuery({
@@ -103,7 +114,7 @@ export default function Hub({ media }: { media: Media }) {
             Trailers
           </Button>
         )}
-        <Button icon="dice" onClick={() => useApp.getState().set({ surprise: media })}>
+        <Button icon="dice" onClick={() => useApp.getState().set({ surprise: media === 'anime' ? 'tv' : media })}>
           Surprise me
         </Button>
       </PageHeader>
@@ -117,8 +128,23 @@ export default function Hub({ media }: { media: Media }) {
           </Button>
         </div>
       )}
-      {media === 'tv' && <Tracking />}
-      <FilterBar value={filters} onChange={setFilters} media={media} platforms={platforms} hasServices={hasServices} />
+      {(media === 'tv' || media === 'anime') && <Tracking anime={media === 'anime'} />}
+      {media === 'anime' && (
+        <div className="mx-(--pad) mb-3">
+          <Segmented
+            label="Series or films"
+            size="sm"
+            value={filters.media?.length === 1 ? filters.media[0] : 'both'}
+            onChange={(v) => setFilters({ ...filters, media: v === 'both' ? undefined : [v as Media] })}
+            options={[
+              { value: 'both', label: 'Everything' },
+              { value: 'tv', label: 'Series', icon: 'tv' },
+              { value: 'movie', label: 'Films', icon: 'film' },
+            ]}
+          />
+        </div>
+      )}
+      <FilterBar value={filters} onChange={setFilters} media={media === 'anime' ? 'tv' : media} platforms={platforms} hasServices={hasServices} />
       {q.isPending ? (
         <GridSkeleton />
       ) : q.error ? (

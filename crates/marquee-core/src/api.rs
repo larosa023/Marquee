@@ -57,6 +57,10 @@ fn key_status(ctx: &Ctx) -> Vec<Value> {
 fn bootstrap(ctx: &Ctx) -> Result<Value> {
     let settings = store::all_settings(&ctx.db)?;
     let conn = ctx.db.lock();
+    // Cheap when nothing changed; makes the TV / Anime split right from the first screen.
+    if let Err(e) = crate::feeds::mark_anime(&conn) {
+        tracing::warn!("couldn't mark anime: {e}");
+    }
     let lists = store::lists(&conn)?;
     let unread: i64 = conn.query_row("SELECT count(*) FROM notifications WHERE read_at IS NULL", [], |r| r.get(0))?;
     let pending: i64 = conn.query_row("SELECT count(*) FROM pending_writes", [], |r| r.get(0))?;
@@ -254,11 +258,8 @@ pub async fn dispatch(ctx: &Arc<Ctx>, method: &str, p: Value) -> Result<Value> {
         // ---------------------------------------------------------- feeds
         "home" => feeds::home(c)?,
         "for_you" => feeds::for_you(c, &filters(&p), p["offset"].as_u64().unwrap_or(0) as usize, p["limit"].as_u64().unwrap_or(40).min(100) as usize)?,
-        "hub" => {
-            let media = Media::parse(text(&p, "media")?).ok_or_else(|| Error::msg("Unknown media type."))?;
-            feeds::hub(c, media, &filters(&p), p["offset"].as_u64().unwrap_or(0) as usize, p["limit"].as_u64().unwrap_or(60).min(120) as usize)?
-        }
-        "tracked_shows" => json!(feeds::tracked_shows(c)?),
+        "hub" => feeds::hub(c, text(&p, "media")?, &filters(&p), p["offset"].as_u64().unwrap_or(0) as usize, p["limit"].as_u64().unwrap_or(60).min(120) as usize)?,
+        "tracked_shows" => json!(feeds::tracked_shows(c, p["anime"].as_bool().unwrap_or(false))?),
         "calendar" => json!(feeds::calendar(c, text(&p, "from")?, text(&p, "to")?, opt(&p, "scope").unwrap_or("taste"))?),
         "reel" => {
             let media = match opt(&p, "media") {

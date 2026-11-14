@@ -513,6 +513,7 @@ async fn refresh_tracked(ctx: &Ctx) -> Result<()> {
 
 /// Rebuilds the taste profile and every score. Fast enough to run after any rating.
 pub fn rescore(ctx: &Ctx) -> Result<usize> {
+    crate::feeds::mark_anime(&ctx.db.lock())?;
     taste::profile::rebuild(&ctx.db)?;
     let n = taste::score::score_all(&ctx.db)?;
     ctx.emit("taste:updated", json!({ "scored": n }));
@@ -642,6 +643,8 @@ pub async fn run(ctx: &Ctx, only: Option<&str>) -> Result<SyncReport> {
         let _ = ctx.http.prune_cache();
     }
     progress(ctx, if report.offline { "Offline: showing what's saved" } else { "Up to date" }, 1.0);
+    // Let SQLite refresh its query statistics now and then (cheap; a no-op when nothing changed).
+    let _ = ctx.db.lock().execute_batch("PRAGMA optimize;");
     ctx.emit("sync:done", json!({ "offline": report.offline, "events": report.events, "warnings": report.warnings }));
     Ok(report)
 }

@@ -7,7 +7,7 @@ import { api, errorMessage, on, shell } from './lib/api';
 import { useHotkeys } from './lib/hotkeys';
 import { appearanceFrom, applyScale, applyTheme, resolveTheme } from './lib/theme';
 import type { Bootstrap } from './lib/types';
-import { useApp, type SystemInfo, type UpdateInfo } from './state/app';
+import { navigation, useApp, type SystemInfo, type UpdateInfo } from './state/app';
 import { refreshFeeds } from './ui/actions';
 import { Logo } from './ui/Logo';
 import { Modal, Toasts } from './ui/overlays';
@@ -56,6 +56,8 @@ function Page({ path }: { path: string }) {
       return <Hub media="movie" />;
     case 'tv':
       return <Hub media="tv" />;
+    case 'anime':
+      return <Hub media="anime" />;
     case 'games':
       return sub === 'backlog' ? <Backlog /> : <Hub media="game" />;
     case 'wrapped':
@@ -249,9 +251,43 @@ function Shell() {
     return () => window.removeEventListener('hashchange', sync);
   }, []);
 
-  // New page: back to the top. Also keep the shell informed, so a live update returns here.
+  // A new page starts at the top; Back and Forward return to where that page was scrolled.
+  // Also keep the shell informed, so a live update returns here.
+  const scrollMemory = useRef(new Map<string, number>());
+  const shownPath = useRef(path);
   useEffect(() => {
-    scroller.current?.scrollTo({ top: 0 });
+    const el = scroller.current;
+    if (!el) return;
+    let frame = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => scrollMemory.current.set(shownPath.current, el.scrollTop));
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      el.removeEventListener('scroll', onScroll);
+    };
+  }, [boot]);
+  useEffect(() => {
+    const el = scroller.current;
+    shownPath.current = path;
+    const pushed = navigation.pushed;
+    navigation.pushed = false;
+    const target = pushed ? 0 : (scrollMemory.current.get(path) ?? 0);
+    if (!el) return;
+    el.scrollTo({ top: 0 });
+    if (!target) return;
+    // The page fades in and its data may still be arriving: keep trying until it's tall enough.
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      if (el.scrollHeight - el.clientHeight >= target || tries > 20) {
+        el.scrollTo({ top: target });
+        clearInterval(timer);
+      }
+    }, 60);
+    return () => clearInterval(timer);
   }, [path]);
   useEffect(() => {
     void shell('set_ui_state', { state: { route: location.hash } }).catch(() => {});
@@ -276,6 +312,7 @@ function Shell() {
     calendar: () => go('/calendar'),
     movies: () => go('/movies'),
     tv: () => go('/tv'),
+    anime: () => go('/anime'),
     games: () => go('/games'),
     music: () => go('/music'),
     lists: () => go('/lists'),

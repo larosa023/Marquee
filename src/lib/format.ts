@@ -87,6 +87,7 @@ export function typeBadge(card: Pick<Card, 'media' | 'meta'>): string {
     const t = card.meta?.album_type;
     return t === 'ep' ? 'EP' : t === 'single' ? 'Single' : 'Album';
   }
+  if (card.meta?.anime === true) return 'Anime';
   return mediaLabel[card.media];
 }
 

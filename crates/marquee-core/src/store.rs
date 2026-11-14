@@ -44,6 +44,29 @@ pub fn find_item(conn: &Connection, source: &str, media: Media, ext_id: &str) ->
     Ok(conn.query_row("SELECT item_id FROM item_ids WHERE source = ?1 AND media = ?2 AND ext_id = ?3", params![source, media.as_str(), ext_id], |r| r.get(0)).optional()?)
 }
 
+/// Folds item `drop` into item `keep`: ratings, plays, list places, follows, ids and history move
+/// over (where `keep` already has the same thing, its copy wins), then `drop` is deleted.
+pub fn merge_items(conn: &Connection, keep: i64, drop: i64) -> Result<()> {
+    if keep == drop {
+        return Ok(());
+    }
+    for table in ["item_ids", "user_events", "list_items", "follows", "price_history", "playtime_log"] {
+        conn.execute(&format!("UPDATE OR IGNORE {table} SET item_id = ?1 WHERE item_id = ?2"), params![keep, drop])?;
+    }
+    conn.execute("UPDATE notifications SET item_id = ?1 WHERE item_id = ?2", params![keep, drop])?;
+    conn.execute("UPDATE OR IGNORE item_similar SET similar_id = ?1 WHERE similar_id = ?2 AND item_id != ?1", params![keep, drop])?;
+    // Keep the details of whichever copy had more.
+    conn.execute(
+        "UPDATE items SET poster = COALESCE(poster, (SELECT poster FROM items WHERE id = ?2)), backdrop = COALESCE(backdrop, (SELECT backdrop FROM items WHERE id = ?2)),
+                          overview = COALESCE(overview, (SELECT overview FROM items WHERE id = ?2)), release_date = COALESCE(release_date, (SELECT release_date FROM items WHERE id = ?2)),
+                          data = json_patch((SELECT data FROM items WHERE id = ?2), data)
+         WHERE id = ?1",
+        params![keep, drop],
+    )?;
+    conn.execute("DELETE FROM items WHERE id = ?1", [drop])?;
+    Ok(())
+}
+
 /// Looser match for imports that only have a title and year.
 pub fn find_item_by_title(conn: &Connection, media: Media, title: &str, year: Option<i32>) -> Result<Option<i64>> {
     let st = sort_title(title);
@@ -163,6 +186,13 @@ pub fn upsert_item_at(conn: &Connection, d: &ItemDraft, target: Option<i64>) -> 
     };
 
     for (source, ext) in &d.ids {
+        // The same title stored twice (say, once from TVmaze and once from TMDB, before either
+        // knew the other's id): fold the other copy into this one.
+        if let Some(other) = find_item(conn, source, media, ext)? {
+            if other != id {
+                merge_items(conn, id, other)?;
+            }
+        }
         conn.execute("INSERT OR IGNORE INTO item_ids (source, ext_id, media, item_id) VALUES (?1, ?2, ?3, ?4)", params![source, ext, media.as_str(), id])?;
     }
 
@@ -260,7 +290,9 @@ pub fn card_from_row(r: &Row) -> rusqlite::Result<Card> {
     let data: Value = serde_json::from_str(&r.get::<_, String>(13)?).unwrap_or(Value::Null);
     let why: Vec<String> = r.get::<_, Option<String>>(12)?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
     let mut meta = Map::new();
-    for key in ["artist", "price", "discount", "platforms", "providers", "next_episode", "album_type", "status", "deck", "low", "seasons_count", "network", "developer", "director", "trailer", "spotify_url", "store_url", "header", "ttb"] {
+    for key in
+        ["artist", "price", "discount", "platforms", "providers", "next_episode", "album_type", "status", "deck", "low", "seasons_count", "network", "developer", "director", "trailer", "spotify_url", "store_url", "header", "ttb", "anime"]
+    {
         if let Some(v) = data.get(key).filter(|v| !v.is_null()) {
             meta.insert(key.into(), v.clone());
         }
@@ -584,6 +616,25 @@ pub fn is_connected(conn: &Connection, id: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_same_show_stored_twice_is_folded_into_one_when_their_ids_meet() {
+        let conn = crate::db::Db::memory().unwrap();
+        let conn = conn.lock();
+        let maze = upsert_item(&conn, &ItemDraft::new(Media::Tv, "Severance").id("tvmaze", 44933).id("imdb", "tt11280740")).unwrap();
+        record_event(&conn, maze, "trakt", EventKind::Rating, 5.0, None, None, &serde_json::Value::Null).unwrap();
+        let tmdb = upsert_item(&conn, &ItemDraft::new(Media::Tv, "Severance").id("tmdb", 95396)).unwrap();
+        add_to_list(&conn, list_id(&conn, "watchlist").unwrap(), tmdb, "local").unwrap();
+        assert_ne!(maze, tmdb);
+        // TMDB's details carry the IMDb id, which TVmaze's copy already has.
+        let kept = upsert_item_at(&conn, &ItemDraft::new(Media::Tv, "Severance").id("tmdb", 95396).id("imdb", "tt11280740"), Some(tmdb)).unwrap();
+        assert_eq!(kept, tmdb);
+        let items: i64 = conn.query_row("SELECT count(*) FROM items WHERE media = 'tv'", [], |r| r.get(0)).unwrap();
+        assert_eq!(items, 1);
+        assert_eq!(find_item(&conn, "tvmaze", Media::Tv, "44933").unwrap(), Some(tmdb));
+        let rated: i64 = conn.query_row("SELECT count(*) FROM user_events WHERE item_id = ?1 AND kind = 'rating'", [tmdb], |r| r.get(0)).unwrap();
+        assert_eq!(rated, 1, "the rating moved over");
+    }
 
     fn arrival() -> ItemDraft {
         let mut d = ItemDraft::new(Media::Movie, "Arrival").id("tmdb", 329865).id("imdb", "tt2543164");

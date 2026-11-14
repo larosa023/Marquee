@@ -40,8 +40,23 @@ fn record(ctx: &Ctx, row: Option<(String, i64, String)>) {
 
 pub const DEFAULT_CAP_MB: u64 = 1024;
 
-const HOSTS: &[&str] =
-    &["image.tmdb.org", "images.igdb.com", "coverartarchive.org", "archive.org", "steamstatic.com", "steampowered.com", "akamaihd.net", "scdn.co", "spotifycdn.com", "fastly.net", "last.fm", "ytimg.com", "ltrbxd.com", "cdn.myanimelist.net"];
+const HOSTS: &[&str] = &[
+    "image.tmdb.org",
+    "images.igdb.com",
+    "coverartarchive.org",
+    "archive.org",
+    "steamstatic.com",
+    "steampowered.com",
+    "akamaihd.net",
+    "scdn.co",
+    "spotifycdn.com",
+    "fastly.net",
+    "last.fm",
+    "ytimg.com",
+    "ltrbxd.com",
+    "cdn.myanimelist.net",
+    "static.tvmaze.com",
+];
 
 pub fn allowed(url: &str) -> bool {
     let Ok(u) = url::Url::parse(url) else { return false };

@@ -159,6 +159,9 @@ fn draft(row: &Value) -> Option<ItemDraft> {
     if let Some(trakt) = s(ids, "trakt") {
         d.ids.push(("trakt".into(), trakt));
     }
+    if let Some(tvdb) = s(ids, "tvdb") {
+        d.ids.push(("tvdb".into(), tvdb));
+    }
     if d.ids.is_empty() {
         return None;
     }

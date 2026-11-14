@@ -21,6 +21,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: 'calendar', label: 'Calendar', combo: 'Ctrl+3' },
   { id: 'movies', label: 'Movies', combo: 'Ctrl+4' },
   { id: 'tv', label: 'TV', combo: 'Ctrl+5' },
+  { id: 'anime', label: 'Anime', combo: 'Ctrl+Shift+5' },
   { id: 'games', label: 'Games', combo: 'Ctrl+6' },
   { id: 'music', label: 'Music', combo: 'Ctrl+7' },
   { id: 'lists', label: 'Lists', combo: 'Ctrl+8' },

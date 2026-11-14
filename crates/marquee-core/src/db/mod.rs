@@ -8,8 +8,13 @@ use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-pub const MIGRATIONS: &[(u32, &str)] =
-    &[(1, include_str!("migrations/0001_init.sql")), (2, include_str!("migrations/0002_myanimelist.sql")), (3, include_str!("migrations/0003_retry_details.sql")), (4, include_str!("migrations/0004_backlog_wrapped_alerts.sql"))];
+pub const MIGRATIONS: &[(u32, &str)] = &[
+    (1, include_str!("migrations/0001_init.sql")),
+    (2, include_str!("migrations/0002_myanimelist.sql")),
+    (3, include_str!("migrations/0003_retry_details.sql")),
+    (4, include_str!("migrations/0004_backlog_wrapped_alerts.sql")),
+    (5, include_str!("migrations/0005_speed.sql")),
+];
 
 #[derive(Clone)]
 pub struct Db {
@@ -34,6 +39,9 @@ impl Db {
         conn.pragma_update(None, "journal_mode", "WAL").ok();
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
+        // Sorting and grouping in memory, and a 16 MB page cache: feeds query the same few tables.
+        conn.pragma_update(None, "temp_store", "MEMORY").ok();
+        conn.pragma_update(None, "cache_size", -16_000).ok();
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         migrate(&mut conn)?;
         Ok(Self { conn: Arc::new(Mutex::new(conn)), path })

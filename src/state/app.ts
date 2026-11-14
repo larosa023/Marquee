@@ -93,6 +93,10 @@ export const EMPTY: never[] = [];
 
 let toastId = 0;
 
+/** Whether the latest route change came from a link or button (true) or from Back/Forward
+ * (false), so Back can return to where the page was scrolled. */
+export const navigation = { pushed: false };
+
 export const useApp = create<AppState>((set, get) => ({
   boot: null,
   sys: null,
@@ -124,6 +128,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
   navigate: (path) => {
     if (path === get().path && !get().item) return;
+    navigation.pushed = true;
     location.hash = toHash({ path, item: null });
   },
   openItem: (id, origin) => {

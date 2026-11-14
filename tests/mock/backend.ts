@@ -83,6 +83,7 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
     mk('game', 'Ember Atlas', -10),
     mk('album', 'Glass Weather', 15),
     mk('tv', 'Northlight', 30),
+    mk('tv', 'Starlit Blade', 6, { meta: { anime: true, network: 'MAPPA' } }),
   ];
   const byId = (id: number) => catalog.find((c) => c.id === id);
 
@@ -172,7 +173,12 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
         return { cards, next: null, total: cards.length };
       }
       case 'hub':
-        return { cards: visible().filter((c) => c.media === p.media), next: null, genres: [{ id: 'Science Fiction', count: 3 }], platforms: p.media === 'game' ? ['PC'] : [] };
+        return {
+          cards: visible().filter((c) => (p.media === 'anime' ? !!c.meta?.anime && (!p.filters?.media?.length || p.filters.media.includes(c.media)) : c.media === p.media && !(p.media === 'tv' && c.meta?.anime))),
+          next: null,
+          genres: [{ id: 'Science Fiction', count: 3 }],
+          platforms: p.media === 'game' ? ['PC'] : [],
+        };
       case 'tracked_shows':
         return [];
       case 'calendar':

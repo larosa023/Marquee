@@ -312,7 +312,7 @@ export default function Detail({ id }: { id: number }) {
   const { data, error, refetch } = useQuery({ queryKey: ['item', id], queryFn: () => api<DetailData>('item', { id }), staleTime: 60_000 });
   const episodes = useQuery({
     queryKey: ['episodes', id],
-    queryFn: () => api<{ seasons: any[][]; average: number | null; source: 'IMDb' | 'TMDB'; imdb: { rating: number; votes: number; url: string | null } | null; attribution: string | null }>('item.episodes', { id }),
+    queryFn: () => api<{ seasons: any[][]; average: number | null; source: 'IMDb' | 'TMDB' | 'TVmaze'; imdb: { rating: number; votes: number; url: string | null } | null; attribution: string | null }>('item.episodes', { id }),
     enabled: data?.item.media === 'tv' && !!(data.item.ids.tmdb || data.item.ids.imdb),
     staleTime: 3_600_000,
     retry: false,

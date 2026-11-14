@@ -17,6 +17,7 @@ export const NAV: { path: string; label: string; icon: IconName }[] = [
   { path: '/calendar', label: 'Calendar', icon: 'calendar' },
   { path: '/movies', label: 'Movies', icon: 'film' },
   { path: '/tv', label: 'TV', icon: 'tv' },
+  { path: '/anime', label: 'Anime', icon: 'anime' },
   { path: '/games', label: 'Games', icon: 'gamepad' },
   { path: '/music', label: 'Music', icon: 'music' },
   { path: '/lists', label: 'Lists', icon: 'list' },

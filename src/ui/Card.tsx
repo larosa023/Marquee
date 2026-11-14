@@ -43,7 +43,7 @@ export function MatchRing({ pct, size = 38, stroke = 3.5, label = true }: { pct:
 export function TypeBadge({ card }: { card: Pick<CardData, 'media' | 'meta'> }) {
   return (
     <span className="inline-flex h-5.5 items-center gap-1 rounded-md bg-black/60 px-1.5 text-[11px] font-semibold uppercase tracking-wide text-white backdrop-blur-sm">
-      <Icon name={mediaIcon[card.media]} size={12} />
+      <Icon name={card.meta?.anime === true ? 'anime' : mediaIcon[card.media]} size={12} />
       {typeBadge(card)}
     </span>
   );

@@ -2,6 +2,29 @@
 
 All notable changes to Marquee are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.3.0
+
+### Anime and TV are separate
+- **Anime has its own screen** in the sidebar (and Ctrl+Shift+5), between TV and Games: this season's and next season's anime, with Everything / Series / Films, the usual filters, and "Anime you're watching" with next-episode countdowns.
+- **TV no longer shows anime.** It's back to shows: premieres, new seasons and the shows you're watching.
+- Anime means anything from MyAnimeList, or animated and Japanese (or tagged anime). Western animation like *Arcane* stays on TV. Cards say "Anime" instead of "TV".
+
+### TV works with no setup
+- Without a TMDB key, TV now fills itself from **TVmaze**, which needs no key: season and series premieres from six weeks of network and streaming schedules, brand-new shows, posters, details, cast, next-episode dates (with finales marked), and episode ratings for the heatmap.
+- Shows from your Trakt or Letterboxd history get posters and details the same way, matched by IMDb or TheTVDB id, or by title and year.
+- Returning shows count as new when their new season premieres, not by their first-ever air date, so new seasons of older shows appear on TV.
+- If you add a TMDB key later, the TVmaze and TMDB copies of a show are folded into one, keeping your ratings, plays and list places.
+
+### Faster and smoother
+- New database indexes for the lookups every screen makes (is it on a list, is it followed, best matches first). Each screen's query now runs in about 10 ms with 20,000 titles.
+- A larger SQLite cache, in-memory sorting, and a statistics refresh after each sync.
+- **Back returns to where you were scrolled** on the previous screen; following a link still starts at the top.
+- **Filters stick** on Movies, TV, Anime, Games and Music while the app is open, so leaving a screen and coming back doesn't reset them.
+
+### Fixed
+- Albums and films from your history that have no release date no longer fill Movies and Music as "TBA" new releases. Undated titles only show when a catalog lists them as announced but undated.
+- Items stored twice under different ids (one from one service, one from another) are merged automatically as soon as a shared id turns up.
+
 ## 0.2.1
 
 ### Changed

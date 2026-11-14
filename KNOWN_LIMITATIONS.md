@@ -63,6 +63,13 @@ Spotify's February 2026 rules for personal ("development mode") apps shape what 
 
 - **Not included.** None has an official library API for third-party desktop apps; the community routes rely on scraping or on signing in with your account password, which Marquee won't do. Bring those libraries in through the file importer instead (a Backloggd or spreadsheet export works).
 
+### TVmaze
+
+- **TV without a TMDB key comes from TVmaze**, which needs no key. It covers premieres on networks in your country and on streaming services, posters, show details, next episodes and per-episode ratings. It has no trailers and no where-to-watch, and its episode ratings come from far fewer voters than IMDb's. Add a TMDB key (or switch on IMDb ratings) for those.
+- TVmaze allows about 20 requests every 10 seconds, so the first TV sync (six weeks of schedules) takes around a minute; later syncs reuse what's saved.
+- Daily shows (news, talk, sports, game shows) are left out of premieres on purpose.
+- When a TMDB key is added later, shows found through TVmaze are matched to TMDB by their IMDb id and the two copies are folded into one, keeping your ratings and list places.
+
 ### TMDB, IGDB, MusicBrainz
 
 - **Game lengths** in the backlog are IGDB's player-reported times to beat, so they need the IGDB (Twitch) keys, and new or obscure games may have none.

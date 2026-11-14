@@ -446,6 +446,7 @@ function Shortcuts() {
 }
 
 const ATTRIBUTIONS: { name: string; text: string; url: string }[] = [
+  { name: 'TVmaze', text: 'TV listings, posters and episode ratings from TVmaze, licensed CC BY-SA. Used for TV when no TMDB key is set.', url: 'https://www.tvmaze.com' },
   { name: 'TMDB', text: 'This product uses the TMDB API but is not endorsed or certified by TMDB. Movie and TV metadata, images and trailers come from TMDB.', url: 'https://www.themoviedb.org' },
   { name: 'JustWatch', text: 'Streaming, rental and purchase availability is provided by JustWatch, through TMDB.', url: 'https://www.justwatch.com' },
   { name: 'IGDB', text: 'Game data is provided by IGDB.com, through the Twitch developer API.', url: 'https://www.igdb.com' },
