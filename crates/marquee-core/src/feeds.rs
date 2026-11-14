@@ -15,6 +15,9 @@ use std::collections::HashMap;
 
 /// Titles that may appear in a feed: scored (blocked and dismissed titles have no score row).
 const VISIBLE: &str = "i.media != 'artist' AND s.item_id IS NOT NULL";
+/// A game on sale at, or within 10% of, the lowest price on record (see `notifications::near_low`).
+const NEAR_LOW: &str = "COALESCE(json_extract(i.data, '$.discount'), 0) > 0 AND json_extract(i.data, '$.low.cents') IS NOT NULL AND json_extract(i.data, '$.price.cents') <= json_extract(i.data, '$.low.cents') * 1.1";
+
 const NOT_DONE: &str = "NOT EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind IN ('watched', 'play', 'rating', 'owned'))";
 
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -30,6 +33,8 @@ pub struct Filters {
     /// Only titles streaming on a service the user subscribes to.
     pub my_services: bool,
     pub on_sale: bool,
+    /// Only games at or near their lowest price on record.
+    pub near_low: bool,
     /// Cents.
     pub max_price: Option<i64>,
     pub platform: Option<String>,
@@ -91,6 +96,9 @@ fn where_clause(ctx: &Ctx, f: &Filters) -> (String, Vec<Sql>) {
     }
     if f.on_sale {
         sql.push("COALESCE(json_extract(i.data, '$.discount'), 0) > 0".into());
+    }
+    if f.near_low {
+        sql.push(NEAR_LOW.into());
     }
     if let Some(max) = f.max_price {
         sql.push("json_extract(i.data, '$.price.cents') IS NOT NULL AND json_extract(i.data, '$.price.cents') <= ?".into());
@@ -238,6 +246,20 @@ pub fn home(ctx: &Ctx) -> Result<Value> {
         0,
     )?;
     push(row("artists", "New From Artists You Love", "Fresh albums, EPs and singles", artists));
+
+    let lows = query_cards(
+        ctx,
+        &format!(
+            "{VISIBLE} AND i.media = 'game' AND {NEAR_LOW}
+             AND (EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind = 'wishlist') OR EXISTS (SELECT 1 FROM list_items l WHERE l.item_id = i.id))
+             AND NOT EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind = 'owned')"
+        ),
+        &[],
+        "COALESCE(json_extract(i.data, '$.discount'), 0) DESC",
+        20,
+        0,
+    )?;
+    push(row("wishlist-lows", "Wishlist Deals at Their Lowest", "At or near the lowest price on record", lows));
 
     let wish = query_cards(
         ctx,
@@ -456,6 +478,29 @@ pub fn quick_rate(ctx: &Ctx, limit: usize) -> Result<Vec<Card>> {
     }
     out.truncate(limit);
     Ok(out)
+}
+
+/// The trailer reel: trailers for new and upcoming titles you'd probably like, best matches first,
+/// mixed across media so it isn't ten superhero films in a row. `skip` holds what's been shown.
+pub fn reel(ctx: &Ctx, media: Option<Media>, skip: &[i64], limit: usize) -> Result<Vec<Card>> {
+    let mut sql = vec![
+        VISIBLE.to_string(),
+        "json_extract(i.data, '$.trailer.key') IS NOT NULL".into(),
+        "(i.release_date IS NULL OR i.release_date >= ?)".into(),
+        NOT_DONE.into(),
+        "NOT EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind = 'dismiss')".into(),
+    ];
+    let mut args = vec![Sql::Text(days_from_today(-45))];
+    if let Some(m) = media {
+        sql.push("i.media = ?".into());
+        args.push(Sql::Text(m.as_str().into()));
+    }
+    if !skip.is_empty() {
+        sql.push(format!("i.id NOT IN ({})", in_list(skip.len())));
+        args.extend(skip.iter().map(|id| Sql::Integer(*id)));
+    }
+    let pool = query_cards(ctx, &sql.join(" AND "), &args, "s.score DESC, i.popularity DESC", (limit * 4) as i64, 0)?;
+    spread(ctx, pool, limit, 0.55)
 }
 
 /// "Surprise me": one random title for a spark, drawn from the titles the user would probably
@@ -979,6 +1024,23 @@ mod tests {
         assert!(!home["hero"].as_array().unwrap().is_empty());
         let card = home["rows"][0]["cards"][0].clone();
         assert!(card["match_pct"].is_number() && card["title"].is_string() && card["media"].is_string());
+    }
+
+    #[test]
+    fn the_reel_only_has_titles_with_trailers_and_never_repeats() {
+        let (t, ids) = world();
+        {
+            let conn = t.ctx.db.lock();
+            for id in ids.values() {
+                conn.execute("UPDATE items SET data = json_set(data, '$.trailer', json('{\"site\":\"youtube\",\"key\":\"abc\"}')) WHERE id = ?1", [id]).unwrap();
+            }
+        }
+        let first = reel(&t.ctx, None, &[], 12).unwrap();
+        assert!(!first.is_empty());
+        assert!(first.iter().all(|c| c.meta["trailer"]["key"] == "abc" && !c.done));
+        let seen: Vec<i64> = first.iter().map(|c| c.id).collect();
+        let next = reel(&t.ctx, None, &seen, 12).unwrap();
+        assert!(next.iter().all(|c| !seen.contains(&c.id)));
     }
 
     #[test]

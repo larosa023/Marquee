@@ -255,16 +255,18 @@ interface Notify {
   enabled: boolean;
   releases: boolean;
   seasons: boolean;
+  episodes: boolean;
   albums: boolean;
   sales: boolean;
   sale_threshold: number;
   digest: boolean;
+  deals: boolean;
   digest_day: number;
   quiet_enabled: boolean;
   quiet_from: string;
   quiet_to: string;
 }
-const NOTIFY_DEFAULT: Notify = { enabled: true, releases: true, seasons: true, albums: true, sales: true, sale_threshold: 25, digest: true, digest_day: 4, quiet_enabled: true, quiet_from: '22:00', quiet_to: '08:00' };
+const NOTIFY_DEFAULT: Notify = { enabled: true, releases: true, seasons: true, episodes: true, albums: true, sales: true, sale_threshold: 25, digest: true, deals: true, digest_day: 4, quiet_enabled: true, quiet_from: '22:00', quiet_to: '08:00' };
 
 function Notifications() {
   const [stored, setStored] = useSetting<Partial<Notify>>('notifications', {});
@@ -277,6 +279,7 @@ function Notifications() {
       <Toggle checked={n.enabled} onChange={(enabled) => set({ enabled })} label="Windows notifications" description="Show a Windows toast when something happens. Everything still appears in the bell inside Marquee." />
       <Toggle checked={n.releases} disabled={off} onChange={(releases) => set({ releases })} label="Release day" description="When something you follow or saved comes out." />
       <Toggle checked={n.seasons} disabled={off} onChange={(seasons) => set({ seasons })} label="New seasons" description="Premieres and finales of shows you watch." />
+      <Toggle checked={n.episodes} disabled={off} onChange={(episodes) => set({ episodes })} label="New episodes" description="Every new episode of a show you're watching (seen in the last 60 days, or followed), with where to watch it." />
       <Toggle checked={n.albums} disabled={off} onChange={(albums) => set({ albums })} label="New music" description="New albums, EPs and singles from artists you follow." />
       <Toggle checked={n.sales} disabled={off} onChange={(sales) => set({ sales })} label="Steam wishlist sales" description="When a wishlisted game goes on sale." />
       <Field label="Only tell me about sales of at least" description="Smaller discounts are still shown on the Games screen.">
@@ -286,6 +289,7 @@ function Notifications() {
         </div>
       </Field>
       <Toggle checked={n.digest} disabled={off} onChange={(digest) => set({ digest })} label='Weekly "Your Marquee" digest' description="One summary of the week's releases that match your taste." />
+      <Toggle checked={n.deals} disabled={off} onChange={(deals) => set({ deals })} label="Weekly wishlist deals" description="On digest day: wishlisted games at or near the lowest price on record." />
       <Field label="Digest day">
         <Select label="Digest day" className="w-44" value={String(n.digest_day)} onChange={(v) => set({ digest_day: Number(v) })} options={['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((d, i) => ({ value: String(i), label: d }))} />
       </Field>

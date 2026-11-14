@@ -65,13 +65,21 @@ Spotify's February 2026 rules for personal ("development mode") apps shape what 
 
 ### TMDB, IGDB, MusicBrainz
 
+- **Game lengths** in the backlog are IGDB's player-reported times to beat, so they need the IGDB (Twitch) keys, and new or obscure games may have none.
 - Where-to-watch data is JustWatch's, through TMDB, and varies in completeness by country.
 - MusicBrainz allows one request a second, so the first music sync for a large library takes a few minutes. Marquee paces itself and caches what it gets.
+
+## Wrapped
+
+- **Hours played count from your first Steam sync of the year.** Steam reports lifetime playtime only, so Marquee logs the totals each day it syncs and counts the difference. For a year that began before you installed Marquee, games last played that year are listed without hours.
+- **Listening needs Last.fm.** Plays, top artists and hours come from your Last.fm charts for the year; Spotify doesn't offer listening history beyond the last 50 tracks.
+- **Watch time is estimated** from runtimes: 110 minutes for a film and 45 for an episode when the runtime is unknown.
 
 ## Windows and the app
 
 - **Snap layouts.** The custom title bar supports snapping by dragging, Win+arrow keys, and Win+Z. The snap-layout flyout that appears when hovering a standard maximize button does not appear on a custom-drawn one (a WebView2 limitation).
 - **Clicking a Windows toast** brings up the notification center entry, but does not open the specific title in Marquee; use the bell inside Marquee for that.
+- **New-episode toasts** can't carry a button, so "Where to watch" lives on the notification in Marquee's bell. It opens the title's watch page (JustWatch, through TMDB), which links to each service; services don't publish links into their own apps.
 - **Trailers** play through YouTube's privacy-enhanced embed. Videos whose owners block embedding show YouTube's "watch on YouTube" message; the button beside the player opens them in your browser.
 - **Unsigned installer.** Updates are signed and verified with Marquee's own key. The installer itself is only Authenticode-signed if you add a code-signing certificate to the release workflow; without one, Windows SmartScreen shows a warning the first time it runs.
 - **Built-in API keys can be extracted** from the installer by anyone determined to. See README → API keys.

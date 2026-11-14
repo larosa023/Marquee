@@ -2,6 +2,35 @@
 
 All notable changes to Marquee are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.2.0
+
+### Game backlog
+- A new Backlog screen (Games → Backlog, or Ctrl+K → "Game backlog") lists every game you saved to Play Later or own and have played for under an hour.
+- Each game shows how long it takes to beat (rushed, main story, 100%) from IGDB's player-reported times, plus its match and any discount. The total main-story hours are shown at the top.
+- Sort by start next, shortest, longest, best match or biggest discount; filter to Play Later or owned-and-unplayed.
+- **Start next** picks one released game for you: a strong match you can finish soon, nudged up if it's on sale, with the reason spelled out. Mark games as beaten straight from the list.
+- Lengths are looked up during sync (up to 300 games, rechecked monthly); Steam games are matched to IGDB by their store links.
+
+### Marquee Wrapped
+- Your year in review at Taste → "Your year in review" (or Ctrl+K → "Marquee Wrapped"): total hours, titles and ratings; films, episodes and hours watched; hours played per game; plays, hours and top artists from Last.fm; your favourites in each medium; your busiest month; the genres and themes you were into (with the ones that are new since last year); the creators you kept coming back to; your boldest pick; and your first title of the year.
+- Look back at earlier years from the year picker.
+- **Share** draws a portrait image of your year to copy or save.
+- Marquee now logs Steam playtime each day it syncs, so hours played can be counted per year.
+- In December and January, Home shows a shortcut to your year.
+
+### New-episode alerts with where to watch
+- A new notification for every new episode of a show you're watching (an episode seen in the last 60 days, or followed). Settings → Notifications → New episodes turns it off.
+- Episode, premiere and finale alerts say where to watch, preferring a service you have, and the notification in the bell has a "Where to watch" button.
+
+### Wishlist deals
+- A weekly "Wishlist deals" notification on your digest day listing wishlisted games at, or within 10% of, their lowest price on record (Settings → Notifications → Weekly wishlist deals).
+- A new Home row, "Wishlist Deals at Their Lowest", and a "Near all-time low" filter on the Games screen.
+
+### Trailer reel
+- A full-screen reel of trailers for new and upcoming titles you'd probably like, best matches first and mixed across movies, shows and games (Home → Trailer reel, the Trailers button on Movies, TV and Games, or Ctrl+K).
+- Next and back with the arrow keys or the scroll wheel; it moves on by itself when a trailer ends. S saves, X marks "not for me" (and won't show it again), Enter opens the title, and an "Up next" strip lets you jump ahead.
+- Opening a title pauses the reel; closing it brings you back.
+
 ## 0.1.7
 
 ### Fixed

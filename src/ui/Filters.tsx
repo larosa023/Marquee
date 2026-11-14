@@ -161,6 +161,9 @@ export function FilterBar({ value, onChange, media, platforms, hasServices }: Pr
             <Chip icon="tag" selected={!!value.on_sale} onClick={() => set({ on_sale: !value.on_sale })}>
               On sale
             </Chip>
+            <Chip icon="flame" selected={!!value.near_low} onClick={() => set({ near_low: !value.near_low })}>
+              Near all-time low
+            </Chip>
             <Select
               label="Price"
               className="w-36"
@@ -216,5 +219,5 @@ export function FilterBar({ value, onChange, media, platforms, hasServices }: Pr
 }
 
 export function activeFilterCount(f: Filters): number {
-  return (f.media?.length ?? 0) + (f.genres?.length ?? 0) + (f.album_types?.length ?? 0) + [f.status && f.status !== 'all', f.max_runtime, f.min_runtime, f.my_services, f.on_sale, f.max_price != null, f.platform, f.wishlisted, f.tracking, f.my_artists].filter(Boolean).length;
+  return (f.media?.length ?? 0) + (f.genres?.length ?? 0) + (f.album_types?.length ?? 0) + [f.status && f.status !== 'all', f.max_runtime, f.min_runtime, f.my_services, f.on_sale, f.near_low, f.max_price != null, f.platform, f.wishlisted, f.tracking, f.my_artists].filter(Boolean).length;
 }

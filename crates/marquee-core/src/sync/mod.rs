@@ -56,6 +56,11 @@ pub fn apply(ctx: &Ctx, source: &str, synced: &Synced) -> Result<usize> {
         }
     }
 
+    if source == "steam" {
+        // Steam reports lifetime minutes only: log today's totals so a year's hours can be worked out.
+        tx.execute("INSERT OR REPLACE INTO playtime_log (item_id, day, minutes) SELECT item_id, date('now', 'localtime'), value FROM user_events WHERE source = 'steam' AND kind = 'play'", [])?;
+    }
+
     for (target, drafts) in &synced.lists {
         let remote: Vec<i64> = drafts.iter().filter_map(|d| store::upsert_item(&tx, d).ok()).collect();
         if target == "spotify:following" {
@@ -583,6 +588,9 @@ pub async fn run(ctx: &Ctx, only: Option<&str>) -> Result<SyncReport> {
         if only.is_none() && !report.offline {
             if let Err(e) = refresh_tracked(ctx).await {
                 report.offline |= e.is_offline();
+            }
+            if let Err(e) = crate::backlog::refresh_lengths(ctx).await {
+                tracing::debug!("couldn't look up game lengths: {e}");
             }
         }
     }

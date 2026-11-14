@@ -293,6 +293,8 @@ pub struct Notification {
     pub item_id: Option<i64>,
     pub created_at: String,
     pub read: bool,
+    /// Somewhere to go from the notification, such as the title's "where to watch" page.
+    pub url: Option<String>,
 }
 
 pub fn now() -> String {

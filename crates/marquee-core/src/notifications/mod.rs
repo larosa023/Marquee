@@ -17,11 +17,15 @@ pub struct NotifySettings {
     pub enabled: bool,
     pub releases: bool,
     pub seasons: bool,
+    /// Every new episode of a show being watched, not just premieres and finales.
+    pub episodes: bool,
     pub albums: bool,
     pub sales: bool,
     /// Minimum discount (percent) worth a sale alert.
     pub sale_threshold: i64,
     pub digest: bool,
+    /// Weekly round-up of wishlisted games at or near their lowest price.
+    pub deals: bool,
     /// 0 = Monday ... 6 = Sunday.
     pub digest_day: u32,
     pub quiet_enabled: bool,
@@ -32,7 +36,21 @@ pub struct NotifySettings {
 
 impl Default for NotifySettings {
     fn default() -> Self {
-        NotifySettings { enabled: true, releases: true, seasons: true, albums: true, sales: true, sale_threshold: 25, digest: true, digest_day: 4, quiet_enabled: true, quiet_from: "22:00".into(), quiet_to: "08:00".into() }
+        NotifySettings {
+            enabled: true,
+            releases: true,
+            seasons: true,
+            episodes: true,
+            albums: true,
+            sales: true,
+            sale_threshold: 25,
+            digest: true,
+            deals: true,
+            digest_day: 4,
+            quiet_enabled: true,
+            quiet_from: "22:00".into(),
+            quiet_to: "08:00".into(),
+        }
     }
 }
 
@@ -78,6 +96,22 @@ pub fn toastable(db: &Db) -> Result<Vec<Notification>> {
     Ok(list.into_iter().rev().take(4).rev().collect())
 }
 
+/// Where a title streams, preferring a service the user has: ("Netflix", the watch page).
+fn watch_on(conn: &rusqlite::Connection, data: &Value) -> (Option<String>, Option<String>) {
+    let mine: Vec<i64> = conn.query_row("SELECT value FROM settings WHERE key = 'my_providers'", [], |r| r.get::<_, String>(0)).ok().and_then(|v| serde_json::from_str(&v).ok()).unwrap_or_default();
+    let stream = data["providers"]["stream"].as_array().cloned().unwrap_or_default();
+    let pick = stream.iter().find(|p| p["id"].as_i64().map(|id| mine.contains(&id)).unwrap_or(false)).or(stream.first());
+    (pick.and_then(|p| p["name"].as_str()).map(str::to_string), data["providers"]["link"].as_str().map(str::to_string))
+}
+
+/// Is this wishlisted game at (or within 10% of) the lowest price on record?
+pub fn near_low(data: &Value) -> bool {
+    match (data["price"]["cents"].as_i64(), data["low"]["cents"].as_i64()) {
+        (Some(now), Some(low)) if now > 0 && data["discount"].as_i64().unwrap_or(0) > 0 => now as f64 <= low as f64 * 1.1,
+        _ => false,
+    }
+}
+
 fn price_text(data: &Value) -> String {
     data["price"]["text"].as_str().map(|t| format!(" ({t})")).unwrap_or_default()
 }
@@ -119,7 +153,17 @@ pub fn generate(ctx: &Ctx) -> Result<usize> {
         }
     }
 
-    if s.seasons {
+    // Shows being watched right now: an episode seen in the last 60 days, or followed.
+    let watching: Vec<i64> = {
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT i.id FROM items i WHERE i.media = 'tv'
+               AND (EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind = 'watched' AND e.at >= ?1)
+                 OR EXISTS (SELECT 1 FROM follows f WHERE f.item_id = i.id))",
+        )?;
+        let rows = stmt.query_map([days_from_today(-60)], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
+        rows
+    };
+    if s.seasons || s.episodes {
         // Shows the user watches, saved or follows, whose next episode airs today.
         let mut stmt = conn.prepare(
             "SELECT i.id, i.title, i.data FROM items i
@@ -133,16 +177,23 @@ pub fn generate(ctx: &Ctx) -> Result<usize> {
             let data: Value = serde_json::from_str(&data).unwrap_or(Value::Null);
             let ep = &data["next_episode"];
             let (season, episode) = (ep["season"].as_i64().unwrap_or(0), ep["episode"].as_i64().unwrap_or(0));
-            let (heading, body) = if episode == 1 && season == 1 {
-                ("Premiere", format!("{title} premieres today."))
+            let (heading, mut body) = if episode == 1 && season == 1 {
+                ("Premiere".to_string(), format!("{title} premieres today."))
             } else if episode == 1 {
-                ("New season", format!("Season {season} of {title} starts today."))
+                ("New season".to_string(), format!("Season {season} of {title} starts today."))
             } else if ep["finale"] == true {
-                ("Season finale", format!("The season {season} finale of {title} airs today."))
+                ("Season finale".to_string(), format!("The season {season} finale of {title} airs today."))
+            } else if s.episodes && watching.contains(&id) {
+                let name = ep["name"].as_str().filter(|n| !n.is_empty() && !n.starts_with("Episode ")).map(|n| format!(": \u{201c}{n}\u{201d}")).unwrap_or_default();
+                ("New episode".to_string(), format!("{title} S{season}·E{episode}{name} is out today."))
             } else {
-                continue; // ordinary episodes are on the calendar, not in your notifications
+                continue; // other episodes are on the calendar, not in your notifications
             };
-            if store::add_notification(&conn, "season", &format!("season:{id}:{season}:{episode}"), heading, &body, Some(id))?.is_some() {
+            let (service, link) = watch_on(&conn, &data);
+            if let Some(service) = service {
+                body.push_str(&format!(" Watch on {service}."));
+            }
+            if store::add_notification_link(&conn, "season", &format!("season:{id}:{season}:{episode}"), &heading, &body, Some(id), link.as_deref())?.is_some() {
                 made += 1;
             }
         }
@@ -189,6 +240,27 @@ pub fn generate(ctx: &Ctx) -> Result<usize> {
             let body = format!("{title} is {discount}% off{}{}", price_text(&data), if low { ", the lowest price Marquee has seen." } else { "." });
             // One alert per game per sale week, unless the discount gets deeper.
             if store::add_notification(&conn, "sale", &format!("sale:{id}:{}-{}:{discount}", week.year(), week.week()), "On sale", &body, Some(id))?.is_some() {
+                made += 1;
+            }
+        }
+    }
+
+    if s.deals && chrono::Local::now().weekday().num_days_from_monday() == s.digest_day {
+        let mut stmt = conn.prepare(
+            "SELECT i.title, i.data FROM items i
+             WHERE i.media = 'game' AND COALESCE(json_extract(i.data, '$.discount'), 0) > 0
+               AND (EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind = 'wishlist') OR EXISTS (SELECT 1 FROM list_items l WHERE l.item_id = i.id))
+               AND NOT EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind = 'owned')
+             ORDER BY json_extract(i.data, '$.discount') DESC",
+        )?;
+        let rows: Vec<(String, String)> = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<rusqlite::Result<_>>()?;
+        let lows: Vec<String> = rows.into_iter().filter(|(_, d)| near_low(&serde_json::from_str(d).unwrap_or(Value::Null))).map(|(t, _)| t).collect();
+        if !lows.is_empty() {
+            let week = chrono::Local::now().iso_week();
+            let lead = lows.iter().take(3).cloned().collect::<Vec<_>>().join(", ");
+            let more = lows.len().saturating_sub(3);
+            let body = if more > 0 { format!("{lead} and {more} more from your wishlist are at or near their lowest price.") } else { format!("{lead} {} at or near the lowest price on record.", if lows.len() == 1 { "is" } else { "are" }) };
+            if store::add_notification(&conn, "deals", &format!("deals:{}-{}", week.year(), week.week()), "Wishlist deals", &body, None)?.is_some() {
                 made += 1;
             }
         }
@@ -261,26 +333,69 @@ mod tests {
     }
 
     #[test]
-    fn premieres_new_seasons_and_finales_alert_but_ordinary_episodes_do_not() {
+    fn premieres_finales_and_episodes_of_shows_being_watched_alert_with_where_to_watch() {
         let t = ctx();
+        store::set_setting(&t.ctx.db, "my_providers", &vec![337]).unwrap();
         {
             let conn = t.ctx.db.lock();
-            for (n, (title, season, episode, finale)) in [("Severance", 3, 1, false), ("The Bear", 4, 10, true), ("Slow Horses", 5, 3, false)].into_iter().enumerate() {
+            for (n, (title, season, episode, finale, watched)) in [("Severance", 3, 1, false, true), ("The Bear", 4, 10, true, true), ("Slow Horses", 5, 3, false, true), ("Saved Only", 2, 4, false, false)].into_iter().enumerate() {
                 let mut d = ItemDraft::new(Media::Tv, title).id("tmdb", n as i64 + 1);
-                d.set("next_episode", json!({ "air_date": today(), "season": season, "episode": episode, "finale": finale }));
+                d.set("next_episode", json!({ "air_date": today(), "season": season, "episode": episode, "finale": finale, "name": "Hello, Ms. Cobel" }));
+                d.set("providers", json!({ "link": "https://www.themoviedb.org/tv/1/watch?locale=US", "stream": [{ "id": 8, "name": "Netflix" }, { "id": 337, "name": "Disney Plus" }] }));
                 let id = store::upsert_item(&conn, &d).unwrap();
-                store::record_event(&conn, id, "trakt", EventKind::Watched, 1.0, None, None, &Value::Null).unwrap();
+                if watched {
+                    store::record_event(&conn, id, "trakt", EventKind::Watched, 1.0, None, None, &Value::Null).unwrap();
+                } else {
+                    store::add_to_list(&conn, store::list_id(&conn, "watchlist").unwrap(), id, "local").unwrap();
+                }
             }
         }
-        assert_eq!(generate(&t.ctx).unwrap(), 2);
-        let bodies: Vec<String> = store::notifications(&t.ctx.db.lock(), 10).unwrap().into_iter().map(|n| n.body).collect();
-        assert!(bodies.contains(&"Season 3 of Severance starts today.".to_string()));
-        assert!(bodies.contains(&"The season 4 finale of The Bear airs today.".to_string()));
+        assert_eq!(generate(&t.ctx).unwrap(), 3, "an ordinary episode of a show only saved doesn't alert");
+        let n = store::notifications(&t.ctx.db.lock(), 10).unwrap();
+        let bodies: Vec<&str> = n.iter().map(|n| n.body.as_str()).collect();
+        assert!(bodies.contains(&"Season 3 of Severance starts today. Watch on Disney Plus."), "{bodies:?}");
+        assert!(bodies.contains(&"The season 4 finale of The Bear airs today. Watch on Disney Plus."));
+        assert!(bodies.contains(&"Slow Horses S5·E3: \u{201c}Hello, Ms. Cobel\u{201d} is out today. Watch on Disney Plus."));
+        assert!(n.iter().all(|n| n.url.as_deref() == Some("https://www.themoviedb.org/tv/1/watch?locale=US")));
+
+        let t = ctx();
+        store::set_setting(&t.ctx.db, "notifications", &NotifySettings { episodes: false, ..Default::default() }).unwrap();
+        {
+            let conn = t.ctx.db.lock();
+            let mut d = ItemDraft::new(Media::Tv, "Slow Horses").id("tmdb", 9);
+            d.set("next_episode", json!({ "air_date": today(), "season": 5, "episode": 3 }));
+            let id = store::upsert_item(&conn, &d).unwrap();
+            store::record_event(&conn, id, "trakt", EventKind::Watched, 1.0, None, None, &Value::Null).unwrap();
+        }
+        assert_eq!(generate(&t.ctx).unwrap(), 0, "episode alerts can be turned off");
+    }
+
+    #[test]
+    fn the_weekly_deals_round_up_lists_wishlisted_games_near_their_lowest_price() {
+        let t = ctx();
+        let today_n = chrono::Local::now().weekday().num_days_from_monday();
+        store::set_setting(&t.ctx.db, "notifications", &NotifySettings { sales: false, digest: false, digest_day: today_n, ..Default::default() }).unwrap();
+        {
+            let conn = t.ctx.db.lock();
+            for (n, (title, cents, low)) in [("At Low", 999, 999), ("Close", 1050, 999), ("Far", 2000, 999)].into_iter().enumerate() {
+                let mut d = ItemDraft::new(Media::Game, title).id("steam", n as i64 + 1);
+                d.set("discount", 40);
+                d.set("price", json!({ "cents": cents }));
+                d.set("low", json!({ "cents": low }));
+                let id = store::upsert_item(&conn, &d).unwrap();
+                store::record_event(&conn, id, "steam", EventKind::Wishlist, 1.0, None, None, &Value::Null).unwrap();
+            }
+        }
+        assert_eq!(generate(&t.ctx).unwrap(), 1);
+        let n = store::notifications(&t.ctx.db.lock(), 10).unwrap();
+        assert_eq!(n[0].title, "Wishlist deals");
+        assert_eq!(n[0].body, "At Low, Close are at or near the lowest price on record.");
     }
 
     #[test]
     fn wishlist_sales_respect_the_threshold_and_skip_owned_games() {
         let t = ctx();
+        store::set_setting(&t.ctx.db, "notifications", &NotifySettings { deals: false, digest: false, ..Default::default() }).unwrap();
         {
             let conn = t.ctx.db.lock();
             for (n, (title, discount, owned)) in [("Deep Cut", 50, false), ("Small Cut", 10, false), ("Already Mine", 80, true)].into_iter().enumerate() {

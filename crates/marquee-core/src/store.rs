@@ -260,7 +260,7 @@ pub fn card_from_row(r: &Row) -> rusqlite::Result<Card> {
     let data: Value = serde_json::from_str(&r.get::<_, String>(13)?).unwrap_or(Value::Null);
     let why: Vec<String> = r.get::<_, Option<String>>(12)?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
     let mut meta = Map::new();
-    for key in ["artist", "price", "discount", "platforms", "providers", "next_episode", "album_type", "status", "deck", "low", "seasons_count", "network", "developer", "director", "trailer", "spotify_url", "store_url", "header"] {
+    for key in ["artist", "price", "discount", "platforms", "providers", "next_episode", "album_type", "status", "deck", "low", "seasons_count", "network", "developer", "director", "trailer", "spotify_url", "store_url", "header", "ttb"] {
         if let Some(v) = data.get(key).filter(|v| !v.is_null()) {
             meta.insert(key.into(), v.clone());
         }
@@ -498,19 +498,27 @@ pub fn follows(conn: &Connection) -> Result<Vec<Follow>> {
 
 /// Stores a notification once (`dedupe` identifies it). Returns its id when it's new.
 pub fn add_notification(conn: &Connection, kind: &str, dedupe: &str, title: &str, body: &str, item_id: Option<i64>) -> Result<Option<i64>> {
-    let n = conn.execute("INSERT OR IGNORE INTO notifications (kind, dedupe, title, body, item_id, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)", params![kind, dedupe, title, body, item_id, now()])?;
+    add_notification_link(conn, kind, dedupe, title, body, item_id, None)
+}
+
+/// A notification with somewhere to go, such as the title's "where to watch" page.
+pub fn add_notification_link(conn: &Connection, kind: &str, dedupe: &str, title: &str, body: &str, item_id: Option<i64>, url: Option<&str>) -> Result<Option<i64>> {
+    let n = conn.execute("INSERT OR IGNORE INTO notifications (kind, dedupe, title, body, item_id, created_at, url) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", params![kind, dedupe, title, body, item_id, now(), url])?;
     Ok(if n > 0 { Some(conn.last_insert_rowid()) } else { None })
 }
 
 pub fn notifications(conn: &Connection, limit: i64) -> Result<Vec<Notification>> {
-    let mut stmt = conn.prepare("SELECT id, kind, title, body, item_id, created_at, read_at IS NOT NULL FROM notifications ORDER BY created_at DESC, id DESC LIMIT ?1")?;
-    let rows = stmt.query_map([limit], |r| Ok(Notification { id: r.get(0)?, kind: r.get(1)?, title: r.get(2)?, body: r.get(3)?, item_id: r.get(4)?, created_at: r.get(5)?, read: r.get(6)? }))?.collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut stmt = conn.prepare("SELECT id, kind, title, body, item_id, created_at, read_at IS NOT NULL, url FROM notifications ORDER BY created_at DESC, id DESC LIMIT ?1")?;
+    let rows = stmt
+        .query_map([limit], |r| Ok(Notification { id: r.get(0)?, kind: r.get(1)?, title: r.get(2)?, body: r.get(3)?, item_id: r.get(4)?, created_at: r.get(5)?, read: r.get(6)?, url: r.get(7)? }))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(rows)
 }
 
 pub fn untoasted(conn: &Connection) -> Result<Vec<Notification>> {
-    let mut stmt = conn.prepare("SELECT id, kind, title, body, item_id, created_at, read_at IS NOT NULL FROM notifications WHERE toasted = 0 ORDER BY id")?;
-    let rows = stmt.query_map([], |r| Ok(Notification { id: r.get(0)?, kind: r.get(1)?, title: r.get(2)?, body: r.get(3)?, item_id: r.get(4)?, created_at: r.get(5)?, read: r.get(6)? }))?.collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut stmt = conn.prepare("SELECT id, kind, title, body, item_id, created_at, read_at IS NOT NULL, url FROM notifications WHERE toasted = 0 ORDER BY id")?;
+    let rows =
+        stmt.query_map([], |r| Ok(Notification { id: r.get(0)?, kind: r.get(1)?, title: r.get(2)?, body: r.get(3)?, item_id: r.get(4)?, created_at: r.get(5)?, read: r.get(6)?, url: r.get(7)? }))?.collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(rows)
 }
 

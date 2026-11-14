@@ -9,6 +9,7 @@ import type { Card } from '@/lib/types';
 import { useApp, useSetting } from '@/state/app';
 import { useQuickAdd } from '@/ui/actions';
 import { MatchRing, TypeBadge } from '@/ui/Card';
+import { Icon } from '@/ui/icons';
 import { useCardMenu } from '@/ui/CardMenu';
 import { Button, EmptyState, ErrorState, OfflineBanner, cx } from '@/ui/primitives';
 import { Row, RowSkeleton } from '@/ui/Row';
@@ -28,6 +29,24 @@ const SPARKS = [
   { kind: 'any', label: 'Anything', icon: 'dice' },
 ] as const;
 
+/** In December and January, a nudge toward the year in review. */
+function WrappedCallout() {
+  const now = new Date();
+  const month = now.getMonth();
+  if (month !== 11 && month !== 0) return null;
+  const year = month === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  return (
+    <button type="button" onClick={() => useApp.getState().navigate(`/wrapped/${year}`)} className="mx-(--pad) mb-5 flex w-[calc(100%-2*var(--pad))] items-center gap-4 rounded-card bg-accent/12 px-5 py-4 text-left transition-colors hover:bg-accent/18">
+      <Icon name="chart" size={22} className="text-accent" />
+      <span className="flex-1">
+        <span className="block font-semibold">Your {year} in Marquee is ready</span>
+        <span className="text-[13px] text-subtext">Hours watched, played and listened, your favourites, and what you were into.</span>
+      </span>
+      <Icon name="chevronRight" size={18} className="text-subtext" />
+    </button>
+  );
+}
+
 /** "Need a spark?": one tap rolls a random pick of each kind. */
 function Spark() {
   const open = (kind: (typeof SPARKS)[number]['kind']) => useApp.getState().set({ surprise: kind });
@@ -40,6 +59,9 @@ function Spark() {
         <p className="text-[13px] text-subtext">Roll a random pick you'd probably like.</p>
       </div>
       <div className="flex flex-wrap gap-2">
+        <Button icon="play" onClick={() => useApp.getState().navigate('/reel')}>
+          Trailer reel
+        </Button>
         {SPARKS.map((s) => (
           <Button key={s.kind} icon={s.icon} variant={s.kind === 'any' ? 'primary' : 'secondary'} onClick={() => open(s.kind)}>
             {s.label}
@@ -239,6 +261,7 @@ export default function Home() {
           </div>
         </div>
       )}
+      <WrappedCallout />
       <Spark />
       {data.rows.map((r) => (
         <Row key={r.id} id={r.id} title={r.title} subtitle={r.subtitle} cards={r.cards} onContext={menu.onContext} />

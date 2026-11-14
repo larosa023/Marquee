@@ -2,7 +2,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
-import { api, inTauri } from '@/lib/api';
+import { api, inTauri, openUrl } from '@/lib/api';
 import { ago } from '@/lib/format';
 import { prettyCombo } from '@/lib/hotkeys';
 import type { Notification } from '@/lib/types';
@@ -186,7 +186,7 @@ function NotificationCenter() {
     useApp.getState().set({ unread: 0 });
     void qc.invalidateQueries({ queryKey: ['notifications'] });
   };
-  const icons: Record<string, IconName> = { release: 'rocket', season: 'tv', album: 'music', sale: 'tag', digest: 'sparkles', system: 'info' };
+  const icons: Record<string, IconName> = { release: 'rocket', season: 'tv', album: 'music', sale: 'tag', deals: 'tag', digest: 'sparkles', system: 'info' };
   return (
     <div ref={ref} className="no-drag relative">
       <IconButton icon="bell" label={unread ? `Notifications, ${unread} unread` : 'Notifications'} active={open} onClick={() => setOpen(!open)} />
@@ -249,6 +249,13 @@ function NotificationCenter() {
                       <span className="clamp-2 text-[13px] text-subtext">{n.body}</span>
                     </span>
                   </button>
+                  {n.url && (
+                    <div className="pb-2 pl-[54px]">
+                      <Button size="sm" icon="external" onClick={() => void openUrl(n.url!)}>
+                        Where to watch
+                      </Button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

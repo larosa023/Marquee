@@ -260,6 +260,21 @@ pub async fn dispatch(ctx: &Arc<Ctx>, method: &str, p: Value) -> Result<Value> {
         }
         "tracked_shows" => json!(feeds::tracked_shows(c)?),
         "calendar" => json!(feeds::calendar(c, text(&p, "from")?, text(&p, "to")?, opt(&p, "scope").unwrap_or("taste"))?),
+        "reel" => {
+            let media = match opt(&p, "media") {
+                None | Some("any") => None,
+                Some(m) => Some(Media::parse(m).ok_or_else(|| Error::msg("Unknown media type."))?),
+            };
+            let skip: Vec<i64> = p["skip"].as_array().map(|a| a.iter().filter_map(|v| v.as_i64()).collect()).unwrap_or_default();
+            json!(feeds::reel(c, media, &skip, 12)?)
+        }
+        "wrapped" => {
+            let year = p["year"].as_i64().map(|y| y as i32).unwrap_or_else(|| chrono::Datelike::year(&chrono::Local::now()));
+            let mut v = crate::wrapped::year(c, year).await?;
+            v["years"] = json!(crate::wrapped::years(c)?);
+            v
+        }
+        "backlog" => json!(crate::backlog::feed(c, &serde_json::from_value(p.clone()).unwrap_or_default())?),
         "surprise" => {
             let media = match opt(&p, "media") {
                 None | Some("any") => None,

@@ -93,6 +93,16 @@ export default function Hub({ media }: { media: Media }) {
   return (
     <>
       <PageHeader title={copy.title} subtitle={copy.subtitle}>
+        {media === 'game' && (
+          <Button icon="clock" onClick={() => navigate('/games/backlog')}>
+            Backlog
+          </Button>
+        )}
+        {media !== 'album' && (
+          <Button icon="play" onClick={() => navigate('/reel')}>
+            Trailers
+          </Button>
+        )}
         <Button icon="dice" onClick={() => useApp.getState().set({ surprise: media })}>
           Surprise me
         </Button>

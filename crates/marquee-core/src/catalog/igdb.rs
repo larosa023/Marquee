@@ -170,6 +170,47 @@ pub async fn by_steam_ids(ctx: &Ctx, appids: &[String]) -> Result<Vec<ItemDraft>
     Ok(out)
 }
 
+/// Steam app id -> IGDB game id, from IGDB's store links.
+pub async fn steam_to_igdb(ctx: &Ctx, appids: &[String]) -> Result<std::collections::HashMap<String, String>> {
+    let mut out = std::collections::HashMap::new();
+    for chunk in appids.chunks(100) {
+        let list = chunk.iter().map(|a| format!("\"{a}\"")).collect::<Vec<_>>().join(",");
+        let rows = query(ctx, "external_games", format!("fields uid,url,game; where uid = ({list}); limit 500;"), 7 * 86_400).await?;
+        for r in rows {
+            if let (Some(u), Some(uid), Some(game)) = (r["url"].as_str(), r["uid"].as_str(), i(&r, "game")) {
+                if u.contains(&format!("store.steampowered.com/app/{uid}")) {
+                    out.insert(uid.to_string(), game.to_string());
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// How long games take to beat (IGDB's player-reported times), in hours:
+/// IGDB game id -> (rushed, main story, completionist).
+pub async fn time_to_beat(ctx: &Ctx, igdb_ids: &[String]) -> Result<std::collections::HashMap<String, Value>> {
+    let hours = |v: &Value, k: &str| v[k].as_f64().filter(|s| *s > 0.0).map(|s| (s / 1800.0).round() / 2.0);
+    let mut out = std::collections::HashMap::new();
+    for chunk in igdb_ids.chunks(200) {
+        let list = chunk.join(",");
+        let rows = match query(ctx, "game_time_to_beats", format!("fields *; where game_id = ({list}); limit 500;"), 7 * 86_400).await {
+            Ok(rows) => rows,
+            // Older documentation names the field `game`.
+            Err(Error::Api { status: 400, .. }) => query(ctx, "game_time_to_beats", format!("fields *; where game = ({list}); limit 500;"), 7 * 86_400).await?,
+            Err(e) => return Err(e),
+        };
+        for r in rows {
+            let Some(game) = i(&r, "game_id").or_else(|| i(&r, "game")) else { continue };
+            let t = json!({ "quick": hours(&r, "hastily"), "main": hours(&r, "normally"), "full": hours(&r, "completely") });
+            if t.as_object().map(|o| o.values().any(|v| !v.is_null())).unwrap_or(false) {
+                out.insert(game.to_string(), t);
+            }
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -4,6 +4,7 @@
 
 pub mod ai;
 pub mod api;
+pub mod backlog;
 pub mod backup;
 pub mod catalog;
 pub mod ctx;
@@ -24,6 +25,7 @@ pub mod taste;
 pub mod themes;
 pub mod updater;
 pub mod util;
+pub mod wrapped;
 
 pub use ctx::{Ctx, Host};
 pub use error::{Error, Result};

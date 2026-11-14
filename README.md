@@ -25,11 +25,15 @@ _Screenshots go here once the first release is installed. Suggested set: Home, a
 - **Detail pages**: trailer, cast and crew, where to watch or buy, why you'd like it, similar titles across every medium, and an episode-rating heatmap for shows.
 - **Lists**: Watchlist, Play Later, Listen Later, Favorites and custom lists; mirror a Trakt watchlist, Steam wishlist or Spotify playlist; share as an image or Markdown.
 - **Your Taste**: what Marquee has learned, shown plainly, with pins, blocks and per-source weights.
+- **Game backlog**: Play Later and owned-but-unplayed games with how long each takes to beat (IGDB), sorted by length, match or discount, with a "start next" pick.
+- **Trailer reel**: full-screen trailers for new and upcoming titles you'd probably like; save or skip as you go.
+- **Marquee Wrapped**: your year in review across movies, shows, games and music, shareable as an image.
+- **Surprise me**: roll a random movie, show, game or album you'd probably like.
 - **Search** across everything, and **vibe search** ("a short cozy game for a rainy Sunday").
 - **Anime from MyAnimeList**: your list, scores and Plan to Watch feed your taste, each season's new anime shows up in the feeds, and you can add, complete and score anime from Marquee.
 - **IMDb episode ratings**, the same numbers SeriesGraph charts, in every show's episode heatmap.
 - **Optional local AI** through [Ollama](https://ollama.com): natural-language vibe search, written blurbs, local embeddings.
-- Windows notifications, a tray panel, a Ctrl+K command palette, eight themes plus a live theme editor, backup and restore, and a signed updater with rollback.
+- Windows notifications (release days, new episodes with where to watch them, wishlist sales and a weekly round-up of games at their lowest price), a tray panel, a Ctrl+K command palette, eight themes plus a live theme editor, backup and restore, and a signed updater with rollback.
 
 The full list is in [CHANGELOG.md](CHANGELOG.md). What a third-party API won't allow, and what Marquee does instead, is in [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md).
 

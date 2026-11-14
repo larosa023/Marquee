@@ -8,7 +8,8 @@ use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-pub const MIGRATIONS: &[(u32, &str)] = &[(1, include_str!("migrations/0001_init.sql")), (2, include_str!("migrations/0002_myanimelist.sql")), (3, include_str!("migrations/0003_retry_details.sql"))];
+pub const MIGRATIONS: &[(u32, &str)] =
+    &[(1, include_str!("migrations/0001_init.sql")), (2, include_str!("migrations/0002_myanimelist.sql")), (3, include_str!("migrations/0003_retry_details.sql")), (4, include_str!("migrations/0004_backlog_wrapped_alerts.sql"))];
 
 #[derive(Clone)]
 pub struct Db {

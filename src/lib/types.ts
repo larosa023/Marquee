@@ -111,6 +111,8 @@ export interface Notification {
   item_id: number | null;
   created_at: string;
   read: boolean;
+  /** Somewhere to go, such as the title's "where to watch" page. */
+  url?: string | null;
 }
 
 export interface Filters {
@@ -121,6 +123,8 @@ export interface Filters {
   max_runtime?: number | null;
   my_services?: boolean;
   on_sale?: boolean;
+  /** Games at or near their lowest price on record. */
+  near_low?: boolean;
   max_price?: number | null;
   platform?: string | null;
   wishlisted?: boolean;

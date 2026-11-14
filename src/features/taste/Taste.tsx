@@ -636,7 +636,11 @@ export default function Taste() {
   const top = ORDER.filter((m) => (s.top_year[m] ?? []).length > 0);
   return (
     <>
-      <PageHeader title="Your Taste" subtitle="What Marquee has learned from your history. It lives on this PC and nowhere else." />
+      <PageHeader title="Your Taste" subtitle="What Marquee has learned from your history. It lives on this PC and nowhere else.">
+        <Button icon="chart" onClick={() => useApp.getState().navigate('/wrapped')}>
+          Your year in review
+        </Button>
+      </PageHeader>
       <div className="space-y-4 px-(--pad)">
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
           <Stat icon="star" label="Rated" value={s.counts.rated.toLocaleString()} sub="titles across all media" />

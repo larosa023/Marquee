@@ -166,6 +166,25 @@ pub async fn scrobbles_between(ctx: &Ctx, user: &str, from: i64, to: i64) -> Res
     Ok(i(&v["recenttracks"]["@attr"], "total").unwrap_or(0))
 }
 
+/// A user's top artists or albums between two unix timestamps, from their weekly charts:
+/// (name, artist for albums, plays). `kind` is "artist" or "album".
+pub async fn chart_between(ctx: &Ctx, user: &str, kind: &str, from: i64, to: i64) -> Result<Vec<(String, Option<String>, i64)>> {
+    let method = if kind == "album" { "user.getWeeklyAlbumChart" } else { "user.getWeeklyArtistChart" };
+    let ttl = if to < chrono::Utc::now().timestamp() - 86_400 { 30 * 86_400 } else { 6 * 3600 };
+    let v = call(ctx, method, &[("user", user), ("from", &from.to_string()), ("to", &to.to_string())], ttl).await?;
+    let root = if kind == "album" { &v["weeklyalbumchart"]["album"] } else { &v["weeklyartistchart"]["artist"] };
+    Ok(root
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|x| {
+            let name = s(x, "name")?;
+            let artist = s(&x["artist"], "#text").or_else(|| s(&x["artist"], "name"));
+            Some((name, artist, i(x, "playcount").unwrap_or(0)))
+        })
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

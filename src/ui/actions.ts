@@ -10,7 +10,7 @@ import { useApp } from '@/state/app';
 
 /** Refetches every feed (they're local queries, so this is cheap). */
 export function refreshFeeds(qc: QueryClient, only?: string[]) {
-  for (const key of only ?? ['home', 'for_you', 'hub', 'calendar', 'lists', 'list', 'item', 'tracked', 'quick_rate', 'taste', 'today', 'search']) {
+  for (const key of only ?? ['home', 'for_you', 'hub', 'calendar', 'lists', 'list', 'item', 'tracked', 'quick_rate', 'taste', 'today', 'search', 'backlog', 'wrapped']) {
     void qc.invalidateQueries({ queryKey: [key] });
   }
 }

@@ -25,6 +25,9 @@ const Settings = lazy(() => import('./features/settings/Settings'));
 const Detail = lazy(() => import('./features/detail/Detail'));
 const Onboarding = lazy(() => import('./features/onboarding/Onboarding'));
 const Tray = lazy(() => import('./features/tray/Tray'));
+const Backlog = lazy(() => import('./features/backlog/Backlog'));
+const Wrapped = lazy(() => import('./features/wrapped/Wrapped'));
+const Reel = lazy(() => import('./features/reel/Reel'));
 const Surprise = lazy(() => import('./features/surprise/Surprise'));
 const UpdateModal = lazy(() => import('./features/settings/DataSections').then((m) => ({ default: m.UpdateModal })));
 
@@ -54,7 +57,9 @@ function Page({ path }: { path: string }) {
     case 'tv':
       return <Hub media="tv" />;
     case 'games':
-      return <Hub media="game" />;
+      return sub === 'backlog' ? <Backlog /> : <Hub media="game" />;
+    case 'wrapped':
+      return <Wrapped key={sub ?? 'latest'} year={sub ? Number(sub) : undefined} />;
     case 'music':
       return <Hub media="album" />;
     case 'lists':
@@ -324,6 +329,11 @@ function Shell() {
             </main>
           </div>
         </div>
+        {top === 'reel' && (
+          <Suspense fallback={<div className="fixed inset-0 z-30 bg-black" />}>
+            <Reel />
+          </Suspense>
+        )}
         <AnimatePresence>
           {item && (
             <Suspense fallback={null}>

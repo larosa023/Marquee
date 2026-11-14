@@ -63,7 +63,7 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
       match_pct: 96 - id * 3,
       why: id % 2 ? ['Because you rated *Test Arrival* 5★'] : ['Because you play a lot of *Fixture Wilds*'],
       genres: media === 'album' ? ['Electronic'] : ['Science Fiction', 'Drama'],
-      meta: media === 'album' ? { artist: 'The Fixtures', album_type: 'album' } : media === 'game' ? { platforms: ['PC'], price: { cents: 2499, currency: 'USD' }, discount: 0 } : {},
+      meta: media === 'album' ? { artist: 'The Fixtures', album_type: 'album' } : media === 'game' ? { platforms: ['PC'], price: { cents: 2499, currency: 'USD' }, discount: 0, trailer: { site: 'youtube', key: 'fixture' }, ttb: { quick: 6, main: 9.5, full: 22 } } : { trailer: { site: 'youtube', key: 'fixture' } },
       user_rating: null,
       done: false,
       saved: false,
@@ -179,6 +179,65 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
         return visible()
           .filter((c) => c.release_date! >= p.from && c.release_date! <= p.to)
           .map((card) => ({ date: card.release_date, kind: 'release', label: card.title, card, pinned: false }));
+      case 'reel': {
+        const skip: number[] = p.skip ?? [];
+        return visible()
+          .filter((c) => c.meta?.trailer && !c.done && !skip.includes(c.id) && (p.media == null || p.media === 'any' || c.media === p.media))
+          .slice(0, 12);
+      }
+      case 'backlog': {
+        const games = visible().filter((c) => c.media === 'game' && !c.done);
+        const sorted = p.sort === 'shortest' ? [...games].sort((a, b) => (a.meta?.ttb?.main ?? 1e9) - (b.meta?.ttb?.main ?? 1e9)) : games;
+        const hours = games.reduce((n, c) => n + (c.meta?.ttb?.main ?? 0), 0);
+        return {
+          cards: sorted,
+          next: sorted[0] ? { card: sorted[0], reason: 'A strong match you can finish this weekend.' } : null,
+          counts: { all: games.length, play_later: games.filter((c) => c.saved).length, unplayed: 0 },
+          hours,
+          with_length: games.filter((c) => c.meta?.ttb?.main).length,
+          lengths_available: true,
+        };
+      }
+      case 'wrapped': {
+        const pick = (m: string) =>
+          visible()
+            .filter((c) => c.media === m)
+            .slice(0, 5);
+        const year = p.year ?? new Date().getFullYear();
+        return {
+          year,
+          years: [year, year - 1],
+          complete: year < new Date().getFullYear(),
+          totals: { hours: 612, titles: 148, rated: 97, avg_rating: 3.8 },
+          movies: { count: 64, hours: 121, best: pick('movie') },
+          tv: { shows: 18, episodes: 214, hours: 160, best: pick('tv') },
+          games: { count: 22, hours: 331, top: pick('game').map((card, i) => ({ card, hours: 90 - i * 15 })), best: [], hours_since: `${year}-01-01` },
+          music: {
+            best: pick('album'),
+            source: 'lastfm',
+            scrobbles: 8420,
+            hours: 491,
+            top_artists: [
+              { name: 'Boards of Canada', plays: 612 },
+              { name: 'Vangelis', plays: 401 },
+            ],
+            top_albums: [],
+            artists_count: 310,
+          },
+          months: [8, 12, 30, 22, 14, 9, 11, 16, 25, 19, 13, 7],
+          busiest: { month: 3, count: 30 },
+          creators: [
+            { name: 'Denis Villeneuve', role: 'director', count: 4 },
+            { name: 'Supergiant Games', role: 'developer', count: 2 },
+          ],
+          taste: [
+            { feature: 'g:sci-fi', label: 'sci-fi', weight: 1, new: false },
+            { feature: 't:melancholic', label: 'melancholic', weight: 0.7, new: true },
+          ],
+          adventurous: pick('movie')[1] ?? null,
+          first: pick('movie')[0] ?? null,
+        };
+      }
       case 'surprise': {
         const skip: number[] = p.skip ?? [];
         const today = new Date().toISOString().slice(0, 10);
