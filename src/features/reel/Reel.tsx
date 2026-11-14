@@ -1,7 +1,7 @@
 /** The trailer reel: full-screen trailers for new and upcoming titles you'd probably like.
  * Next/previous with the arrow keys, the wheel or the buttons; S saves, X skips for good. */
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, errorMessage } from '@/lib/api';
 import { credit, releaseLabel } from '@/lib/format';
 import type { Card, Media } from '@/lib/types';
@@ -28,6 +28,10 @@ export default function Reel() {
   const [exhausted, setExhausted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Set<number>>(new Set());
+  // Trailers start muted; M or the sound button turns sound on for the rest of this visit.
+  const [muted, setMuted] = useState(true);
+  const mutedRef = useRef(true);
+  mutedRef.current = muted;
   const loading = useRef(false);
   const navigate = useApp((s) => s.navigate);
   const openItem = useApp((s) => s.openItem);
@@ -68,6 +72,13 @@ export default function Reel() {
   const card = items[index];
   const next = useCallback(() => setIndex((i) => Math.min(i + 1, Math.max(0, items.length - 1))), [items.length]);
   const prev = useCallback(() => setIndex((i) => Math.max(0, i - 1)), []);
+  const toggleSound = useCallback(() => {
+    setMuted((m) => {
+      const next = !m;
+      frame.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: next ? 'mute' : 'unMute', args: [] }), '*');
+      return next;
+    });
+  }, []);
   const save = useCallback(async () => {
     if (!card || saved.has(card.id) || card.saved) return;
     await quickAdd(card);
@@ -87,6 +98,7 @@ export default function Reel() {
       if (k === 'arrowdown' || k === 'arrowright' || k === 'j') next();
       else if (k === 'arrowup' || k === 'arrowleft' || k === 'k') prev();
       else if (k === 's') void save();
+      else if (k === 'm') toggleSound();
       else if (k === 'x') void skip();
       else if (k === 'enter' && card) openItem(card.id, 'reel');
       else if (k === 'escape') navigate('/home');
@@ -95,7 +107,7 @@ export default function Reel() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [next, prev, save, skip, card, openItem, navigate]);
+  }, [next, prev, save, skip, card, openItem, navigate, toggleSound]);
 
   // One trailer per wheel gesture.
   const wheelLock = useRef(0);
@@ -124,6 +136,9 @@ export default function Reel() {
   const listen = () => frame.current?.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'marquee-reel' }), '*');
 
   const key = card?.meta?.trailer?.key as string | undefined;
+  // Built once per trailer: toggling sound talks to the player instead of reloading it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const src = useMemo(() => (key ? `https://www.youtube-nocookie.com/embed/${key}?autoplay=1&mute=${mutedRef.current ? 1 : 0}&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}` : ''), [key, card?.id]);
   const sub = card ? credit(card) : null;
   const isSaved = !!card && (card.saved || saved.has(card.id));
   return (
@@ -136,7 +151,12 @@ export default function Reel() {
         <div className="no-drag ml-4">
           <Segmented label="Kind" size="sm" value={kind} onChange={setKind} options={KINDS} />
         </div>
-        <span className="tnum ml-auto text-[13px] text-white/60">{items.length ? `${index + 1} / ${items.length}${exhausted ? '' : '+'}` : ''}</span>
+        <div className="no-drag ml-auto">
+          <Button size="sm" icon={muted ? 'volumeOff' : 'volume'} onClick={toggleSound} aria-pressed={!muted}>
+            {muted ? 'Sound off' : 'Sound on'}
+          </Button>
+        </div>
+        <span className="tnum text-[13px] text-white/60">{items.length ? `${index + 1} / ${items.length}${exhausted ? '' : '+'}` : ''}</span>
       </div>
       <div className="flex min-h-0 flex-1 items-center gap-6 px-6 pb-6">
         <div className="relative flex min-w-0 flex-1 items-center justify-center self-stretch">
@@ -155,19 +175,7 @@ export default function Reel() {
           ) : (
             <AnimatePresence mode="wait">
               <motion.div key={card.id} initial={reduce ? { opacity: 0 } : { opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={reduce ? { opacity: 0 } : { opacity: 0, y: -40 }} transition={{ duration: 0.25 }} className="aspect-video w-full max-w-[1400px] overflow-hidden rounded-card bg-black shadow-2xl">
-                {key && !covered && (
-                  <iframe
-                    ref={frame}
-                    title={`${card.title} trailer`}
-                    className="h-full w-full bg-black"
-                    style={{ colorScheme: 'dark' }}
-                    src={`https://www.youtube-nocookie.com/embed/${key}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`}
-                    allow="autoplay; encrypted-media; fullscreen"
-                    allowFullScreen
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    onLoad={listen}
-                  />
-                )}
+                {key && !covered && <iframe ref={frame} title={`${card.title} trailer`} className="h-full w-full bg-black" style={{ colorScheme: 'dark' }} src={src} allow="autoplay; encrypted-media; fullscreen" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" onLoad={listen} />}
               </motion.div>
             </AnimatePresence>
           )}
@@ -210,7 +218,7 @@ export default function Reel() {
               </Button>
             </div>
             <p className="mt-2 text-[12px] leading-relaxed text-white/50">
-              <Kbd>↓</Kbd> next · <Kbd>↑</Kbd> back · <Kbd>S</Kbd> save · <Kbd>X</Kbd> not for me · <Kbd>Enter</Kbd> details · scroll works too
+              <Kbd>↓</Kbd> next · <Kbd>↑</Kbd> back · <Kbd>S</Kbd> save · <Kbd>M</Kbd> sound · <Kbd>X</Kbd> not for me · <Kbd>Enter</Kbd> details · scroll works too
             </p>
             {items.length > index + 1 && (
               <div className="mt-2">

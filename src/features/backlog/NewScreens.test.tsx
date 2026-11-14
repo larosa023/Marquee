@@ -34,6 +34,8 @@ describe('Trailer reel', () => {
     renderApp(<Reel />);
     const first = await screen.findByTitle(/trailer$/);
     expect(first.getAttribute('src')).toContain('youtube-nocookie.com/embed/fixture');
+    expect(first.getAttribute('src')).toContain('mute=1');
+    expect(screen.getByRole('button', { name: 'Sound off' })).toHaveAttribute('aria-pressed', 'false');
     const title = screen.getByRole('complementary', { name: 'About this trailer' }).querySelector('h2')!.textContent;
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));

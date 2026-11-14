@@ -158,7 +158,11 @@ export const PosterCard = memo(function PosterCard({ card, origin, onContext, wi
         >
           <motion.div
             layoutId={morph ? `art-${origin}-${card.id}` : undefined}
-            className="shadow-card relative aspect-2/3 overflow-hidden rounded-card bg-surface transition-shadow duration-300 group-hover:shadow-[0_14px_40px_rgb(0_0_0/0.5),0_0_0_1px_color-mix(in_srgb,var(--accent)_45%,transparent),0_0_38px_color-mix(in_srgb,var(--accent)_calc(var(--glow)*38%),transparent)]"
+            className={cx(
+              // Album covers are square: give them a square box so the whole cover shows, uncropped.
+              card.media === 'album' ? 'aspect-square' : 'aspect-2/3',
+              'shadow-card relative overflow-hidden rounded-card bg-surface transition-shadow duration-300 group-hover:shadow-[0_14px_40px_rgb(0_0_0/0.5),0_0_0_1px_color-mix(in_srgb,var(--accent)_45%,transparent),0_0_38px_color-mix(in_srgb,var(--accent)_calc(var(--glow)*38%),transparent)]',
+            )}
           >
             <Art card={card} className="h-full w-full" />
             <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-2">

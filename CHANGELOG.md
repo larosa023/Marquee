@@ -2,6 +2,12 @@
 
 All notable changes to Marquee are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.2.1
+
+### Changed
+- **Trailers start muted.** The trailer reel now plays every trailer with the sound off. Turn it on with the Sound button at the top or the M key; sound stays on for the rest of that visit, and toggling it doesn't restart the trailer.
+- **Album covers fill their cards.** Albums now get square cards, so the whole cover shows edge to edge instead of sitting at the top of a tall poster box over a blurred copy of itself.
+
 ## 0.2.0
 
 ### Game backlog
