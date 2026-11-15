@@ -2,6 +2,25 @@
 
 All notable changes to Marquee are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.4.0
+
+### Build your taste
+- A new **Build your taste** screen (Taste → Build your taste, or Ctrl+K) lets you shape your profile directly, on top of what Marquee learns from your history. It has five steps:
+  1. **Genres** for Movies, TV, Anime, Games and Music.
+  2. **Moods and themes** that cross every medium (cozy, melancholic, cyberpunk…).
+  3. **Creators**: directors, developers, studios and artists, with search.
+  4. **Rate titles**: things you've watched or played but never rated come first, then popular titles. Rate what you know, or skip with "Haven't seen it".
+  5. **Adventure**: the taste dial.
+- Click a chip to cycle **Like → Love → Dislike → Never → no preference** (right-click clears it). *Like* lifts it, *Love* puts it at the top, *Dislike* pushes it down without banning it, and *Never* hides it entirely. A dot marks what your history already leans toward.
+- A **"Your top picks now"** panel beside the steps updates as you make changes.
+
+### Ratings
+- **Rate from any card**: hover a poster and stars appear along the bottom; click for a rating (halves work), click the same star again to clear it. Rated cards show your stars.
+- A new **Ratings** screen in the sidebar lists everything you've rated, here and from Letterboxd, Trakt and MyAnimeList. It shows your total, your average and a chart of how you spread your stars. You can filter by medium, sort by recent, highest, lowest or title, and change or remove ratings in place.
+
+### Anime vs shows, everywhere
+- **Surprise me** and the **trailer reel** have their own Anime tab, and "Show" now only rolls TV shows (it was mostly rolling anime).
+
 ## 0.3.1
 
 ### Many more movies

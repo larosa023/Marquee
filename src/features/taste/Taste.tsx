@@ -640,6 +640,12 @@ export default function Taste() {
         <Button icon="chart" onClick={() => useApp.getState().navigate('/wrapped')}>
           Your year in review
         </Button>
+        <Button icon="star" onClick={() => useApp.getState().navigate('/ratings')}>
+          Your ratings
+        </Button>
+        <Button variant="primary" icon="sparkles" onClick={() => useApp.getState().navigate('/taste/build')}>
+          Build your taste
+        </Button>
       </PageHeader>
       <div className="space-y-4 px-(--pad)">
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">

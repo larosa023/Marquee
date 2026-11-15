@@ -22,6 +22,7 @@ export const NAV: { path: string; label: string; icon: IconName }[] = [
   { path: '/music', label: 'Music', icon: 'music' },
   { path: '/lists', label: 'Lists', icon: 'list' },
   { path: '/taste', label: 'Taste', icon: 'dna' },
+  { path: '/ratings', label: 'Ratings', icon: 'star' },
   { path: '/settings', label: 'Settings', icon: 'settings' },
 ];
 

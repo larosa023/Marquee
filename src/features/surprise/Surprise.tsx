@@ -12,17 +12,18 @@ import { Icon } from '@/ui/icons';
 import { Modal } from '@/ui/overlays';
 import { Button, Segmented, Toggle } from '@/ui/primitives';
 
-type Kind = Media | 'any';
+type Kind = Media | 'anime' | 'any';
 
-const KINDS: { value: Kind; label: string; icon: 'film' | 'tv' | 'gamepad' | 'music' | 'dice' }[] = [
+const KINDS: { value: Kind; label: string; icon: 'film' | 'tv' | 'anime' | 'gamepad' | 'music' | 'dice' }[] = [
   { value: 'movie', label: 'Movie', icon: 'film' },
   { value: 'tv', label: 'Show', icon: 'tv' },
+  { value: 'anime', label: 'Anime', icon: 'anime' },
   { value: 'game', label: 'Game', icon: 'gamepad' },
   { value: 'album', label: 'Album', icon: 'music' },
   { value: 'any', label: 'Anything', icon: 'dice' },
 ];
 
-const NOUN: Record<Kind, string> = { movie: 'movie', tv: 'show', game: 'game', album: 'album', any: 'title' };
+const NOUN: Record<Kind, string> = { movie: 'movie', tv: 'show', anime: 'anime', game: 'game', album: 'album', any: 'title' };
 
 export default function Surprise() {
   const kind = useApp((s) => s.surprise);
@@ -107,7 +108,7 @@ function Roller({ initial, onDone }: { initial: Kind; onDone: () => void }) {
                 <Icon name="dice" size={30} className="mx-auto mb-3 text-faint" />
                 <p className="font-medium text-text">Nothing to roll yet</p>
                 <p className="mt-1">
-                  No {NOUN[kind]}s you haven't seen{upcoming ? '' : ' that are out'} yet. {upcoming ? 'Sync to fill the catalog.' : 'Try including upcoming ones, or sync to fill the catalog.'}
+                  No {kind === 'anime' ? 'anime' : `${NOUN[kind]}s`} you haven't seen{upcoming ? '' : ' that are out'} yet. {upcoming ? 'Sync to fill the catalog.' : 'Try including upcoming ones, or sync to fill the catalog.'}
                 </p>
               </div>
             </motion.div>

@@ -68,7 +68,7 @@ interface AppState {
   /** The release-notes dialog (opened from the "Update ready" pill). */
   updateOpen: boolean;
   /** The "Surprise me" dialog, opened on a kind of title (or 'any'). */
-  surprise: Media | 'any' | null;
+  surprise: Media | 'anime' | 'any' | null;
   /** A .marqueetheme or .marqueebackup file opened from Explorer, waiting for its screen. */
   pendingFile: string | null;
 

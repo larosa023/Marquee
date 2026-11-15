@@ -74,6 +74,8 @@ export function CommandPalette() {
     out.push({ id: 'go-rate', group: 'Go to', label: 'Quick Rate', icon: 'dice', keywords: 'swipe rate tune', run: () => navigate('/for-you/rate') });
     out.push({ id: 'go-backlog', group: 'Go to', label: 'Game backlog', icon: 'clock', keywords: 'play later pile how long to beat start next', run: () => navigate('/games/backlog') });
     out.push({ id: 'go-reel', group: 'Go to', label: 'Trailer reel', icon: 'play', keywords: 'trailers videos watch upcoming', run: () => navigate('/reel') });
+    out.push({ id: 'go-build', group: 'Go to', label: 'Build your taste', icon: 'sparkles', keywords: 'genres moods creators like dislike love block tune', run: () => navigate('/taste/build') });
+    out.push({ id: 'go-ratings', group: 'Go to', label: 'Your ratings', icon: 'star', keywords: 'rated stars scores', run: () => navigate('/ratings') });
     out.push({ id: 'go-wrapped', group: 'Go to', label: 'Marquee Wrapped', icon: 'chart', keywords: 'year in review stats recap', run: () => navigate('/wrapped') });
     for (const l of boot.lists) out.push({ id: `list-${l.id}`, group: 'Lists', label: l.name, hint: `${l.count} saved`, icon: 'bookmark', run: () => navigate(`/lists/${l.id}`) });
     out.push({
@@ -101,6 +103,7 @@ export function CommandPalette() {
       ['any', 'anything'],
       ['movie', 'a movie'],
       ['tv', 'a show'],
+      ['anime', 'an anime'],
       ['game', 'a game'],
       ['album', 'an album'],
     ] as const) {

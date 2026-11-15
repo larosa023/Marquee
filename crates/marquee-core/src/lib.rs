@@ -6,6 +6,7 @@ pub mod ai;
 pub mod api;
 pub mod backlog;
 pub mod backup;
+pub mod builder;
 pub mod catalog;
 pub mod ctx;
 pub mod db;

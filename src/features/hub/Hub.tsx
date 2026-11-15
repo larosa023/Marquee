@@ -114,7 +114,7 @@ export default function Hub({ media }: { media: Section }) {
             Trailers
           </Button>
         )}
-        <Button icon="dice" onClick={() => useApp.getState().set({ surprise: media === 'anime' ? 'tv' : media })}>
+        <Button icon="dice" onClick={() => useApp.getState().set({ surprise: media })}>
           Surprise me
         </Button>
       </PageHeader>

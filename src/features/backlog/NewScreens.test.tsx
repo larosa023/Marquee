@@ -43,3 +43,24 @@ describe('Trailer reel', () => {
     await waitFor(() => expect(screen.getByRole('complementary', { name: 'About this trailer' }).querySelector('h2')!.textContent).not.toBe(title));
   });
 });
+
+describe('Build your taste', () => {
+  it('cycles a genre to "like" and saves it for a later rescore', async () => {
+    const { default: Builder } = await import('../taste/Builder');
+    await boot();
+    renderApp(<Builder />);
+    await userEvent.click(await screen.findByRole('button', { name: /horror: no preference/i }));
+    await waitFor(() => expect(backend.calls.filter((c) => c.method === 'taste.override').at(-1)?.params).toMatchObject({ feature: 'g:horror', mode: 'like', later: true }));
+    expect(screen.getByRole('button', { name: /horror: like/i })).toBeInTheDocument();
+  });
+});
+
+describe('Your ratings', () => {
+  it('shows totals and lets you re-rate', async () => {
+    const { default: Ratings } = await import('../ratings/Ratings');
+    await boot();
+    renderApp(<Ratings />);
+    expect(await screen.findByRole('heading', { name: 'Your ratings' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'How you rate' })).toBeInTheDocument();
+  });
+});

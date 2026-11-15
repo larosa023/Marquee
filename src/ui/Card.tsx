@@ -5,7 +5,8 @@ import { credit, releaseLabel, typeBadge } from '@/lib/format';
 import { img } from '@/lib/img';
 import type { Card as CardData } from '@/lib/types';
 import { useApp } from '@/state/app';
-import { useQuickAdd } from './actions';
+import { useQuickAdd, useRate } from './actions';
+import { Stars } from './Stars';
 import { Icon, mediaIcon } from './icons';
 import { cx } from './primitives';
 
@@ -112,6 +113,27 @@ export function Art({ card, className, eager, large }: { card: Pick<CardData, 't
   );
 }
 
+/** Rate straight from a card: stars appear over the poster on hover or keyboard focus. */
+function CardStars({ card }: { card: CardData }) {
+  const rate = useRate();
+  const [value, setValue] = useState<number | null>(card.user_rating);
+  useEffect(() => setValue(card.user_rating), [card.user_rating]);
+  return (
+    <div className={cx('absolute bottom-2.5 left-2 z-10 rounded-full bg-black/70 px-1.5 py-1 opacity-0 shadow-lg backdrop-blur-sm transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100')} onClick={(e) => e.stopPropagation()}>
+      <Stars
+        size={15}
+        emptyClass="text-white/35"
+        value={value}
+        label={`Rate ${card.title}`}
+        onChange={(stars) => {
+          setValue(stars || null);
+          void rate(card, stars, true);
+        }}
+      />
+    </div>
+  );
+}
+
 interface PosterCardProps {
   card: CardData;
   /** Names the row or grid this card sits in, so the poster morphs from the right place. */
@@ -170,13 +192,21 @@ export const PosterCard = memo(function PosterCard({ card, origin, onContext, wi
               {card.match_pct != null && <MatchRing pct={card.match_pct} />}
             </div>
             {(card.meta?.discount ?? 0) > 0 && <span className="tnum absolute bottom-2 left-2 rounded-md bg-good px-1.5 py-0.5 text-[12px] font-bold text-black">-{card.meta.discount}%</span>}
-            {card.done && !(card.meta?.discount > 0) && (
-              <span className="absolute bottom-2 left-2 grid h-6 w-6 place-items-center rounded-full bg-black/65 text-good" title="In your history">
-                <Icon name="check" size={14} />
+            {card.user_rating != null && card.user_rating > 0 && !(card.meta?.discount > 0) ? (
+              <span className="tnum absolute bottom-2 left-2 inline-flex h-6 items-center gap-0.5 rounded-full bg-black/65 px-2 text-[12px] font-semibold text-accent transition-opacity group-hover:opacity-0" title="Your rating">
+                ★ {card.user_rating}
               </span>
+            ) : (
+              card.done &&
+              !(card.meta?.discount > 0) && (
+                <span className="absolute bottom-2 left-2 grid h-6 w-6 place-items-center rounded-full bg-black/65 text-good" title="In your history">
+                  <Icon name="check" size={14} />
+                </span>
+              )
             )}
           </motion.div>
         </button>
+        <CardStars card={card} />
         <button
           type="button"
           aria-label={card.saved ? `Saved: ${card.title}` : `Save ${card.title}`}

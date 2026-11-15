@@ -12,12 +12,13 @@ import { Art, MatchRing, TypeBadge } from '@/ui/Card';
 import { Icon } from '@/ui/icons';
 import { Button, IconButton, Kbd, Segmented } from '@/ui/primitives';
 
-type Kind = Media | 'any';
+type Kind = Media | 'anime' | 'any';
 
 const KINDS: { value: Kind; label: string }[] = [
   { value: 'any', label: 'Everything' },
   { value: 'movie', label: 'Movies' },
   { value: 'tv', label: 'Shows' },
+  { value: 'anime', label: 'Anime' },
   { value: 'game', label: 'Games' },
 ];
 

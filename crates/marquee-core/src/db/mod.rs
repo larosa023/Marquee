@@ -14,6 +14,7 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
     (3, include_str!("migrations/0003_retry_details.sql")),
     (4, include_str!("migrations/0004_backlog_wrapped_alerts.sql")),
     (5, include_str!("migrations/0005_speed.sql")),
+    (6, include_str!("migrations/0006_taste_levels.sql")),
 ];
 
 #[derive(Clone)]

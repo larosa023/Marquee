@@ -248,12 +248,18 @@ pub fn rebuild(db: &Db) -> Result<ProfileStats> {
             *w /= m;
         }
     }
-    // Pinned loves sit at the top of their kind no matter what the history says.
+    // Choices made in "Build your taste" override the history: love (pin) tops its kind, like
+    // lifts a feature to at least a solid positive, dislike pushes it below zero.
     {
-        let mut stmt = conn.prepare("SELECT feature FROM taste_overrides WHERE mode = 'pin'")?;
-        for f in stmt.query_map([], |r| r.get::<_, String>(0))? {
-            let f = f?;
-            weights.insert(f.clone(), 1.0);
+        let mut stmt = conn.prepare("SELECT feature, mode FROM taste_overrides WHERE mode IN ('pin', 'like', 'dislike')")?;
+        for row in stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))? {
+            let (f, mode) = row?;
+            let w = weights.entry(f.clone()).or_insert(0.0);
+            *w = match mode.as_str() {
+                "pin" => 1.0,
+                "like" => w.max(0.55),
+                _ => w.min(-0.6),
+            };
             support.entry(f).or_insert(1);
         }
     }

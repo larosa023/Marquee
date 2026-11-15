@@ -247,7 +247,7 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
       case 'surprise': {
         const skip: number[] = p.skip ?? [];
         const today = new Date().toISOString().slice(0, 10);
-        const pool = visible().filter((c) => !c.done && c.poster && (p.media == null || p.media === 'any' || c.media === p.media) && !skip.includes(c.id) && (p.upcoming || (c.release_date ?? '9') <= today));
+        const pool = visible().filter((c) => !c.done && c.poster && (p.media == null || p.media === 'any' || (p.media === 'anime' ? !!c.meta?.anime : c.media === p.media && !(p.media === 'tv' && c.meta?.anime))) && !skip.includes(c.id) && (p.upcoming || (c.release_date ?? '9') <= today));
         return pool[Math.floor(Math.random() * pool.length)] ?? null;
       }
       case 'quick_rate':
@@ -410,6 +410,35 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
       case 'list.markdown': {
         const list = lists.find((l) => l.info.id === p.id)!;
         return `# ${list.info.name}\n\n${list.items.map((i) => `- **${byId(i.id)!.title}**`).join('\n')}\n`;
+      }
+      case 'taste.builder': {
+        const chip = (feature: string, label: string, choice: string | null = null, extra = {}) => ({ feature, label, count: 12, choice, learned: feature === 'g:sci-fi' ? 0.8 : null, ...extra });
+        const genres = [chip('g:sci-fi', 'sci-fi', 'love'), chip('g:horror', 'horror'), chip('g:drama', 'drama', 'like'), chip('g:comedy', 'comedy'), chip('g:romance', 'romance', 'dislike')];
+        return {
+          sections: { movie: { genres, rated: 3 }, tv: { genres, rated: 1 }, anime: { genres, rated: 0 }, game: { genres, rated: 2 }, album: { genres, rated: 0 } },
+          themes: [chip('t:cozy', 'cozy'), chip('t:melancholic', 'melancholic', 'like'), chip('t:gore', 'gore', 'block')],
+          creators: [chip('c:denis-villeneuve', 'Denis Villeneuve', 'love', { role: 'director', yours: 3 }), chip('c:supergiant-games', 'Supergiant Games', null, { role: 'developer', yours: 1 })],
+          other: [],
+          counts: { loved: 2, liked: 2, disliked: 1, blocked: 1 },
+          dial: 0.5,
+        };
+      }
+      case 'taste.creators':
+        return [{ feature: 'c:hayao-miyazaki', label: 'Hayao Miyazaki', count: 4, choice: null, learned: null, role: 'director', yours: 0 }];
+      case 'taste.to_rate':
+        return visible()
+          .filter((c) => !c.user_rating && !(p.skip ?? []).includes(c.id) && (p.section === 'anime' ? !!c.meta?.anime : c.media === p.section))
+          .slice(0, p.limit ?? 24);
+      case 'ratings': {
+        const rated = visible().filter((c) => c.user_rating);
+        return {
+          items: rated.map((card) => ({ card, stars: card.user_rating, at: '2026-11-01T00:00:00Z', source: 'marquee' })),
+          next: null,
+          histogram: [0, 0, 0, 1, 0, 2, 1, 3, 1, 2],
+          total: rated.length,
+          average: 3.9,
+          sections: { movie: rated.filter((c) => c.media === 'movie').length, tv: 0, anime: 0, game: 0, album: 0 },
+        };
       }
       case 'taste':
         return {

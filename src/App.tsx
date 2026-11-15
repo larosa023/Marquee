@@ -25,6 +25,8 @@ const Settings = lazy(() => import('./features/settings/Settings'));
 const Detail = lazy(() => import('./features/detail/Detail'));
 const Onboarding = lazy(() => import('./features/onboarding/Onboarding'));
 const Tray = lazy(() => import('./features/tray/Tray'));
+const Ratings = lazy(() => import('./features/ratings/Ratings'));
+const Builder = lazy(() => import('./features/taste/Builder'));
 const Backlog = lazy(() => import('./features/backlog/Backlog'));
 const Wrapped = lazy(() => import('./features/wrapped/Wrapped'));
 const Reel = lazy(() => import('./features/reel/Reel'));
@@ -44,7 +46,7 @@ const queryClient = new QueryClient({
 });
 
 function Page({ path }: { path: string }) {
-  const [, root, sub] = path.split('/');
+  const [, root, sub, rest] = path.split('/');
   switch (root) {
     case 'home':
       return <Home />;
@@ -67,7 +69,9 @@ function Page({ path }: { path: string }) {
     case 'lists':
       return <Lists listId={sub ? Number(sub) : null} />;
     case 'taste':
-      return <Taste />;
+      return sub === 'build' ? <Builder step={rest} /> : <Taste />;
+    case 'ratings':
+      return <Ratings />;
     case 'search':
       return <Search initial={sub ? decodeURIComponent(sub) : ''} />;
     case 'settings':

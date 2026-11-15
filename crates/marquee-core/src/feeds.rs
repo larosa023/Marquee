@@ -531,6 +531,10 @@ pub fn quick_rate(ctx: &Ctx, limit: usize) -> Result<Vec<Card>> {
 /// The trailer reel: trailers for new and upcoming titles you'd probably like, best matches first,
 /// mixed across media so it isn't ten superhero films in a row. `skip` holds what's been shown.
 pub fn reel(ctx: &Ctx, media: Option<Media>, skip: &[i64], limit: usize) -> Result<Vec<Card>> {
+    reel_in(ctx, media, "", skip, limit)
+}
+
+pub fn reel_in(ctx: &Ctx, media: Option<Media>, anime: &str, skip: &[i64], limit: usize) -> Result<Vec<Card>> {
     let mut sql = vec![
         VISIBLE.to_string(),
         "json_extract(i.data, '$.trailer.key') IS NOT NULL".into(),
@@ -542,6 +546,11 @@ pub fn reel(ctx: &Ctx, media: Option<Media>, skip: &[i64], limit: usize) -> Resu
     if let Some(m) = media {
         sql.push("i.media = ?".into());
         args.push(Sql::Text(m.as_str().into()));
+    }
+    match anime {
+        "only" => sql.push(format!("i.media IN ('tv', 'movie') AND {IS_ANIME}")),
+        "exclude" => sql.push(format!("NOT COALESCE({IS_ANIME}, 0)")),
+        _ => {}
     }
     if !skip.is_empty() {
         sql.push(format!("i.id NOT IN ({})", in_list(skip.len())));
@@ -555,12 +564,22 @@ pub fn reel(ctx: &Ctx, media: Option<Media>, skip: &[i64], limit: usize) -> Resu
 /// like (the top of their picks, widened by the taste dial) rather than from the whole catalog.
 /// `media` = None means any medium; `skip` holds the last few picks so a re-roll is always new.
 pub fn surprise(ctx: &Ctx, media: Option<Media>, upcoming: bool, skip: &[i64]) -> Result<Option<Card>> {
+    surprise_in(ctx, media, "", upcoming, skip)
+}
+
+/// `anime` is "only" (the Anime tab), "exclude" (Show) or "" (no preference).
+pub fn surprise_in(ctx: &Ctx, media: Option<Media>, anime: &str, upcoming: bool, skip: &[i64]) -> Result<Option<Card>> {
     let mut sql = vec!["i.media != 'artist'".to_string(), "i.poster IS NOT NULL".into(), NOT_DONE.into()];
     sql.push("NOT EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind = 'dismiss')".into());
     let mut args: Vec<Sql> = vec![];
     if let Some(m) = media {
         sql.push("i.media = ?".into());
         args.push(Sql::Text(m.as_str().into()));
+    }
+    match anime {
+        "only" => sql.push(format!("i.media IN ('tv', 'movie') AND {IS_ANIME}")),
+        "exclude" => sql.push(format!("NOT COALESCE({IS_ANIME}, 0)")),
+        _ => {}
     }
     if !upcoming {
         sql.push("i.release_date IS NOT NULL AND i.release_date <= ?".into());
@@ -1156,6 +1175,28 @@ mod tests {
         let got = for_you(&t.ctx, &f, 0, 10).unwrap();
         assert_eq!(got["cards"].as_array().unwrap().len(), 1);
         assert_eq!(got["cards"][0]["id"], id);
+    }
+
+    #[test]
+    fn surprise_and_the_reel_keep_shows_and_anime_apart() {
+        let (t, _) = world();
+        let anime = {
+            let conn = t.ctx.db.lock();
+            let mut a = ItemDraft::new(Media::Tv, "Zombie Anime").id("mal", 1);
+            a.release_date = Some(days_from_today(-10));
+            a.poster = Some("https://cdn.myanimelist.net/a.jpg".into());
+            a.set("trailer", json!({ "site": "youtube", "key": "k" }));
+            store::upsert_item(&conn, &a).unwrap()
+        };
+        crate::sync::rescore(&t.ctx).unwrap();
+        for _ in 0..20 {
+            if let Some(c) = surprise_in(&t.ctx, Some(Media::Tv), "exclude", true, &[]).unwrap() {
+                assert_ne!(c.id, anime, "Show never rolls anime");
+            }
+        }
+        assert_eq!(surprise_in(&t.ctx, None, "only", true, &[]).unwrap().unwrap().id, anime);
+        assert!(reel_in(&t.ctx, Some(Media::Tv), "exclude", &[], 12).unwrap().iter().all(|c| c.id != anime));
+        assert!(reel_in(&t.ctx, None, "only", &[], 12).unwrap().iter().all(|c| c.id == anime));
     }
 
     #[test]

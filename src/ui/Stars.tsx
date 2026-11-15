@@ -5,7 +5,7 @@ import { cx } from './primitives';
 
 const STAR = 'M12 2.8l2.8 5.9 6.4.9-4.6 4.5 1.1 6.4L12 17.5l-5.7 3 1.1-6.4-4.6-4.5 6.4-.9z';
 
-export function Stars({ value, onChange, size = 28, label = 'Your rating', readOnly }: { value: number | null; onChange?: (stars: number) => void; size?: number; label?: string; readOnly?: boolean }) {
+export function Stars({ value, onChange, size = 28, label = 'Your rating', readOnly, emptyClass = 'text-strong' }: { value: number | null; onChange?: (stars: number) => void; size?: number; label?: string; readOnly?: boolean; emptyClass?: string }) {
   const [hover, setHover] = useState<number | null>(null);
   const shown = hover ?? value ?? 0;
   const set = (v: number) => onChange?.(Math.max(0, Math.min(5, v)));
@@ -66,7 +66,7 @@ export function Stars({ value, onChange, size = 28, label = 'Your rating', readO
               set(v === value ? 0 : v);
             }}
           >
-            <svg viewBox="0 0 24 24" width={size} height={size} className="absolute inset-0 text-strong">
+            <svg viewBox="0 0 24 24" width={size} height={size} className={cx('absolute inset-0', emptyClass)}>
               <path d={STAR} fill="currentColor" />
             </svg>
             <svg viewBox="0 0 24 24" width={size} height={size} className="absolute inset-0 text-accent transition-[clip-path] duration-100" style={{ clipPath: `inset(0 ${(1 - fill) * 100}% 0 0)` }}>

@@ -262,12 +262,17 @@ pub async fn dispatch(ctx: &Arc<Ctx>, method: &str, p: Value) -> Result<Value> {
         "tracked_shows" => json!(feeds::tracked_shows(c, p["anime"].as_bool().unwrap_or(false))?),
         "calendar" => json!(feeds::calendar(c, text(&p, "from")?, text(&p, "to")?, opt(&p, "scope").unwrap_or("taste"))?),
         "reel" => {
-            let media = match opt(&p, "media") {
-                None | Some("any") => None,
-                Some(m) => Some(Media::parse(m).ok_or_else(|| Error::msg("Unknown media type."))?),
+            // "anime" is its own kind; "tv" (shows) leaves anime out.
+            let (media, anime) = match opt(&p, "media") {
+                None | Some("any") => (None, ""),
+                Some("anime") => (None, "only"),
+                Some(m) => {
+                    let m = Media::parse(m).ok_or_else(|| Error::msg("Unknown media type."))?;
+                    (Some(m), if m == Media::Tv { "exclude" } else { "" })
+                }
             };
             let skip: Vec<i64> = p["skip"].as_array().map(|a| a.iter().filter_map(|v| v.as_i64()).collect()).unwrap_or_default();
-            json!(feeds::reel(c, media, &skip, 12)?)
+            json!(feeds::reel_in(c, media, anime, &skip, 12)?)
         }
         "wrapped" => {
             let year = p["year"].as_i64().map(|y| y as i32).unwrap_or_else(|| chrono::Datelike::year(&chrono::Local::now()));
@@ -277,12 +282,17 @@ pub async fn dispatch(ctx: &Arc<Ctx>, method: &str, p: Value) -> Result<Value> {
         }
         "backlog" => json!(crate::backlog::feed(c, &serde_json::from_value(p.clone()).unwrap_or_default())?),
         "surprise" => {
-            let media = match opt(&p, "media") {
-                None | Some("any") => None,
-                Some(m) => Some(Media::parse(m).ok_or_else(|| Error::msg("Unknown media type."))?),
+            // "anime" is its own kind; "tv" (shows) leaves anime out.
+            let (media, anime) = match opt(&p, "media") {
+                None | Some("any") => (None, ""),
+                Some("anime") => (None, "only"),
+                Some(m) => {
+                    let m = Media::parse(m).ok_or_else(|| Error::msg("Unknown media type."))?;
+                    (Some(m), if m == Media::Tv { "exclude" } else { "" })
+                }
             };
             let skip: Vec<i64> = p["skip"].as_array().map(|a| a.iter().filter_map(|v| v.as_i64()).collect()).unwrap_or_default();
-            json!(feeds::surprise(c, media, p["upcoming"].as_bool().unwrap_or(false), &skip)?)
+            json!(feeds::surprise_in(c, media, anime, p["upcoming"].as_bool().unwrap_or(false), &skip)?)
         }
         "quick_rate" => json!(feeds::quick_rate(c, p["limit"].as_u64().unwrap_or(24) as usize)?),
         "today" => json!(feeds::today_releases(c, p["limit"].as_i64().unwrap_or(8))?),
@@ -444,11 +454,20 @@ pub async fn dispatch(ctx: &Arc<Ctx>, method: &str, p: Value) -> Result<Value> {
 
         // ---------------------------------------------------------- taste
         "taste" => feeds::taste_overview(c)?,
+        "taste.builder" => crate::builder::overview(c)?,
+        "taste.creators" => json!(crate::builder::search_creators(c, opt(&p, "q").unwrap_or(""))?),
+        "taste.to_rate" => {
+            let skip: Vec<i64> = p["skip"].as_array().map(|a| a.iter().filter_map(|v| v.as_i64()).collect()).unwrap_or_default();
+            json!(crate::builder::to_rate(c, opt(&p, "section").unwrap_or("movie"), &skip, p["limit"].as_u64().unwrap_or(24) as usize)?)
+        }
+        "ratings" => crate::builder::ratings(c, opt(&p, "section").unwrap_or("all"), opt(&p, "sort").unwrap_or("recent"), p["offset"].as_u64().unwrap_or(0) as usize, p["limit"].as_u64().unwrap_or(60) as usize)?,
         "taste.override" => {
             let feature = text(&p, "feature")?;
             let conn = c.db.lock();
             match opt(&p, "mode") {
-                Some(mode @ ("pin" | "block")) => {
+                // "love" is the builder's word for pin.
+                Some(mode @ ("pin" | "love" | "like" | "dislike" | "block")) => {
+                    let mode = if mode == "love" { "pin" } else { mode };
                     conn.execute("INSERT INTO taste_overrides (feature, mode) VALUES (?1, ?2) ON CONFLICT (feature) DO UPDATE SET mode = excluded.mode", [feature, mode])?;
                 }
                 _ => {
@@ -456,7 +475,12 @@ pub async fn dispatch(ctx: &Arc<Ctx>, method: &str, p: Value) -> Result<Value> {
                 }
             }
             drop(conn);
-            sync::rescore(c)?;
+            // The builder changes many things in a row: score once they've settled.
+            if p["later"] == true {
+                rescore_soon(ctx);
+            } else {
+                sync::rescore(c)?;
+            }
             Value::Null
         }
         "taste.reset" => {
