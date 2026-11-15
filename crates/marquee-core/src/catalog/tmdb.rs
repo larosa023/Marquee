@@ -157,6 +157,50 @@ pub async fn movies_between(ctx: &Ctx, from: &str, to: &str, pages: u32) -> Resu
     Ok(out)
 }
 
+/// Popular films in one genre between two dates, worldwide (not just the user's region), so a
+/// favourite genre like horror has real depth rather than whatever made the overall top pages.
+pub async fn movies_in_genre(ctx: &Ctx, genre: i64, from: &str, to: &str, pages: u32) -> Result<Vec<ItemDraft>> {
+    let mut out = vec![];
+    let g = genre.to_string();
+    for page in 1..=pages {
+        let p = page.to_string();
+        let v = get(
+            ctx,
+            "/discover/movie",
+            &[("language", &ctx.language()), ("sort_by", "popularity.desc"), ("include_adult", "false"), ("with_genres", &g), ("primary_release_date.gte", from), ("primary_release_date.lte", to), ("vote_count.gte", "5"), ("page", &p)],
+            12 * 3600,
+        )
+        .await?;
+        out.extend(stubs(&v, Some(Media::Movie)));
+        if page as i64 >= i(&v, "total_pages").unwrap_or(1) {
+            break;
+        }
+    }
+    Ok(out)
+}
+
+/// TMDB's movie genre id for one of the user's genre features (such as `g:horror`).
+pub fn movie_genre_id(feature: &str) -> Option<i64> {
+    MOVIE_GENRES.iter().find(|(_, name)| crate::taste::vocab::map_term(name).contains(&feature)).map(|(id, _)| *id)
+}
+
+/// Films in cinemas now and coming soon in the user's region (TMDB's own lists).
+pub async fn now_and_soon(ctx: &Ctx) -> Result<Vec<ItemDraft>> {
+    let region = ctx.region();
+    let mut out = vec![];
+    for path in ["/movie/now_playing", "/movie/upcoming"] {
+        for page in 1..=3u32 {
+            let p = page.to_string();
+            let v = get(ctx, path, &[("language", &ctx.language()), ("region", &region), ("page", &p)], 12 * 3600).await?;
+            out.extend(stubs(&v, Some(Media::Movie)));
+            if page as i64 >= i(&v, "total_pages").unwrap_or(1) {
+                break;
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// Shows that premiere between two dates.
 pub async fn shows_premiering(ctx: &Ctx, from: &str, to: &str, pages: u32) -> Result<Vec<ItemDraft>> {
     let mut out = vec![];
@@ -454,6 +498,13 @@ mod tests {
         assert_eq!(d.data["seasons_count"], 2);
         assert!(d.creators.contains(&Creator::new("Dan Erickson", "creator")));
         assert!(d.creators.contains(&Creator::new("Apple TV+", "network")));
+    }
+
+    #[test]
+    fn favourite_genre_features_map_back_to_tmdb_ids() {
+        assert_eq!(movie_genre_id("g:horror"), Some(27));
+        assert_eq!(movie_genre_id("g:sci-fi"), Some(878));
+        assert_eq!(movie_genre_id("g:not-a-genre"), None);
     }
 
     #[tokio::test]

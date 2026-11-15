@@ -358,9 +358,29 @@ pub async fn refresh(ctx: &Ctx, progress: &(dyn Fn(&str, f64) + Send + Sync)) ->
 
     progress("Checking new movies", 0.05);
     if ctx.has_key("tmdb") {
-        let (m1, m2, m3, m4) = (d(-45), d(0), d(1), d(150));
-        let (a, b, c) = futures::join!(tmdb::movies_between(ctx, &m1, &m2, 3), tmdb::movies_between(ctx, &m3, &m4, 4), tmdb::trending(ctx, Media::Movie));
-        for r in [a, b, c] {
+        // The last four months (what the Movies screen shows as new) and the next six, deep enough
+        // to fill it: about 500 films, plus TMDB's now-playing and upcoming lists and the trending week.
+        let (m1, m2, m3, m4) = (d(-120), d(0), d(1), d(180));
+        let (a, b, c, e) = futures::join!(tmdb::movies_between(ctx, &m1, &m2, 12), tmdb::movies_between(ctx, &m3, &m4, 10), tmdb::trending(ctx, Media::Movie), tmdb::now_and_soon(ctx));
+        // Then the user's favourite genres, worldwide, so a genre filter has plenty in it.
+        let favourites: Vec<i64> = {
+            let conn = ctx.db.lock();
+            let mut stmt = conn
+                .prepare(
+                    "SELECT f.feature FROM user_events e JOIN items i ON i.id = e.item_id JOIN item_features f ON f.item_id = e.item_id
+                     WHERE i.media = 'movie' AND f.feature LIKE 'g:%' AND e.kind IN ('watched', 'rating', 'like', 'watchlist')
+                     GROUP BY f.feature ORDER BY sum(CASE WHEN e.kind = 'rating' THEN e.value - 2 ELSE 1 END) DESC LIMIT 6",
+                )
+                .ok();
+            let feats: Vec<String> = stmt.as_mut().and_then(|s| s.query_map([], |r| r.get(0)).ok().map(|rows| rows.filter_map(|r| r.ok()).collect())).unwrap_or_default();
+            let mut ids: Vec<i64> = feats.iter().filter_map(|f| tmdb::movie_genre_id(f)).collect();
+            ids.dedup();
+            ids.truncate(5);
+            ids
+        };
+        let (g1, g2) = (d(-120), d(180));
+        let genre_lists = futures::future::join_all(favourites.iter().map(|g| tmdb::movies_in_genre(ctx, *g, &g1, &g2, 5))).await;
+        for r in [a, b, c, e].into_iter().chain(genre_lists) {
             match r {
                 Ok(list) => report.movies += save_all(ctx, &list).map(|v| v.len()).unwrap_or(0),
                 Err(e) => offline |= note(&mut report, "Movies", e),
@@ -368,7 +388,7 @@ pub async fn refresh(ctx: &Ctx, progress: &(dyn Fn(&str, f64) + Send + Sync)) ->
         }
         progress("Checking new shows", 0.2);
         let (s1, s2, s3, s4) = (d(-30), d(120), d(-3), d(10));
-        let (a, b, c) = futures::join!(tmdb::shows_premiering(ctx, &s1, &s2, 3), tmdb::shows_airing(ctx, &s3, &s4, 2), tmdb::trending(ctx, Media::Tv));
+        let (a, b, c) = futures::join!(tmdb::shows_premiering(ctx, &s1, &s2, 6), tmdb::shows_airing(ctx, &s3, &s4, 4), tmdb::trending(ctx, Media::Tv));
         for r in [a, b, c] {
             match r {
                 Ok(list) => report.shows += save_all(ctx, &list).map(|v| v.len()).unwrap_or(0),

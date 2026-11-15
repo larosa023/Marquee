@@ -2,6 +2,13 @@
 
 All notable changes to Marquee are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.3.1
+
+### Many more movies
+- Movies now fetches about 500 films each sync instead of about 160: the last four months (it was six weeks, while the screen shows four months), the next six months, TMDB's in-cinemas-now and coming-soon lists, and the trending week.
+- **Your favourite genres get their own deep pull.** Marquee looks at the genres of the films you've watched, rated and saved, and fetches up to 100 more films in each of your top five, worldwide rather than only your region. Filtering by Horror (or whatever you watch most) now has real depth.
+- TV fetches twice as many premieres and airing shows from TMDB.
+
 ## 0.3.0
 
 ### Anime and TV are separate
