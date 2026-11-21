@@ -64,3 +64,19 @@ describe('Your ratings', () => {
     expect(await screen.findByRole('region', { name: 'How you rate' })).toBeInTheDocument();
   });
 });
+
+describe('Title pages', () => {
+  it('save a private note as you type and a price alert for a game', async () => {
+    const { default: Detail } = await import('../detail/Detail');
+    await boot();
+    const { api } = await import('@/lib/api');
+    const game = (await api<{ cards: { id: number }[] }>('hub', { media: 'game', filters: {} })).cards[0];
+    renderApp(<Detail id={game.id} />);
+    const notes = await screen.findByRole('textbox', { name: 'Your notes' });
+    await userEvent.type(notes, 'Play with Sam');
+    await waitFor(() => expect(backend.calls.filter((c) => c.method === 'note.set').at(-1)?.params).toMatchObject({ id: game.id, text: 'Play with Sam' }), { timeout: 3000 });
+    await userEvent.type(screen.getByLabelText("Alert me when it's under"), '9.99');
+    await userEvent.click(screen.getByRole('button', { name: 'Set alert' }));
+    await waitFor(() => expect(backend.calls.filter((c) => c.method === 'price_target.set').at(-1)?.params).toMatchObject({ id: game.id, cents: 999 }));
+  });
+});

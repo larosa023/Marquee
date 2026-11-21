@@ -94,6 +94,37 @@ pub fn library_csv(ctx: &Ctx) -> Result<String> {
     String::from_utf8(w.into_inner().map_err(|e| Error::msg(e.to_string()))?).map_err(|e| Error::msg(e.to_string()))
 }
 
+/// Your film ratings and watches in Letterboxd's import format (letterboxd.com/import), so
+/// ratings made in Marquee, Trakt or anywhere else can be carried into Letterboxd.
+pub fn letterboxd_csv(ctx: &Ctx) -> Result<(String, usize)> {
+    let conn = ctx.db.lock();
+    let mut stmt = conn.prepare(
+        "SELECT i.title, substr(i.release_date, 1, 4),
+                (SELECT x.ext_id FROM item_ids x WHERE x.item_id = i.id AND x.source = 'tmdb' LIMIT 1),
+                (SELECT x.ext_id FROM item_ids x WHERE x.item_id = i.id AND x.source = 'imdb' LIMIT 1),
+                (SELECT e.value FROM user_events e WHERE e.item_id = i.id AND e.kind = 'rating' ORDER BY e.source = 'marquee' DESC, e.at DESC LIMIT 1),
+                (SELECT substr(max(e.at), 1, 10) FROM user_events e WHERE e.item_id = i.id AND e.kind IN ('watched', 'rating')),
+                (SELECT n.text FROM notes n WHERE n.item_id = i.id)
+         FROM items i
+         WHERE i.media = 'movie' AND EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind IN ('watched', 'rating'))
+         ORDER BY i.sort_title",
+    )?;
+    let mut w = csv::Writer::from_writer(vec![]);
+    w.write_record(["Title", "Year", "tmdbID", "imdbID", "Rating", "WatchedDate", "Review"])?;
+    let mut count = 0;
+    let rows = stmt.query_map([], |r| {
+        Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?, r.get::<_, Option<String>>(2)?, r.get::<_, Option<String>>(3)?, r.get::<_, Option<f64>>(4)?, r.get::<_, Option<String>>(5)?, r.get::<_, Option<String>>(6)?))
+    })?;
+    for row in rows {
+        let (title, year, tmdb, imdb, rating, watched, note) = row?;
+        let rating = rating.filter(|r| *r > 0.0).map(|r| format!("{}", (r * 2.0).round() / 2.0)).unwrap_or_default();
+        w.write_record([title, year.unwrap_or_default(), tmdb.unwrap_or_default(), imdb.unwrap_or_default(), rating, watched.unwrap_or_default(), note.unwrap_or_default()])?;
+        count += 1;
+    }
+    let body = String::from_utf8(w.into_inner().map_err(|e| Error::msg(e.to_string()))?).map_err(|e| Error::msg(e.to_string()))?;
+    Ok((body, count))
+}
+
 pub fn library_json(ctx: &Ctx) -> Result<String> {
     Ok(serde_json::to_string_pretty(&json!({ "app": "Marquee", "version": ctx.version, "exported_at": now(), "library": library_rows(ctx)? }))?)
 }
@@ -219,6 +250,23 @@ pub fn write_calendar_file(ctx: &Ctx) -> Result<std::path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn letterboxd_export_has_one_row_per_film_with_ratings_in_halves() {
+        let t = crate::ctx::testing::ctx();
+        {
+            let conn = t.ctx.db.lock();
+            let mut a = ItemDraft::new(Media::Movie, "Arrival").id("tmdb", 329865).id("imdb", "tt2543164");
+            a.release_date = Some("2016-11-11".into());
+            let id = store::upsert_item(&conn, &a).unwrap();
+            store::record_event(&conn, id, "trakt", EventKind::Rating, 4.6, Some("2024-03-02T20:00:00Z"), None, &serde_json::Value::Null).unwrap();
+            conn.execute("INSERT INTO notes (item_id, text, updated_at) VALUES (?1, 'Cried, again', '')", [id]).unwrap();
+            store::upsert_item(&conn, &ItemDraft::new(Media::Movie, "Not Seen").id("tmdb", 1)).unwrap();
+        }
+        let (csv, n) = letterboxd_csv(&t.ctx).unwrap();
+        assert_eq!(n, 1);
+        assert_eq!(csv.lines().nth(1).unwrap(), "Arrival,2016,329865,tt2543164,4.5,2024-03-02,\"Cried, again\"");
+    }
     use crate::ctx::testing::{ctx, TestCtx};
 
     fn world() -> (TestCtx, i64) {

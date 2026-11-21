@@ -30,6 +30,8 @@ _Screenshots go here once the first release is installed. Suggested set: Home, a
 - **Marquee Wrapped**: your year in review across movies, shows, games and music, shareable as an image.
 - **Build your taste**: love, like, dislike or never-show any genre, mood or creator, rate titles you know in bulk, and set how adventurous picks are, with a live preview of your top picks as you go.
 - **Ratings everywhere**: rate from any card by hovering its poster, and see everything you've rated (here and from Letterboxd, Trakt and MyAnimeList) on the Ratings screen, with your average and how you spread your stars.
+- **Notes, price alerts and series**: private notes on any title, an "alert me when it's under $X" price for any game, and progress through film series you've started (with a Home row for the rest).
+- **Letterboxd export**: every film you've rated anywhere, in the file Letterboxd's importer reads.
 - **Surprise me**: roll a random movie, show, game or album you'd probably like.
 - **Search** across everything, and **vibe search** ("a short cozy game for a rainy Sunday").
 - **TV that works with no setup**: premieres, new seasons, posters, next episodes and episode ratings from TVmaze, no key needed (TMDB adds trailers and where-to-watch when you add its key).

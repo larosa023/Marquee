@@ -157,6 +157,23 @@ export function StorageSection() {
             </Button>
           </div>
         </Field>
+        <Field label="Film ratings for Letterboxd" description="Every film you've watched or rated (here, on Trakt or anywhere else), with your rating, date and notes, in the file Letterboxd's importer reads (letterboxd.com/import).">
+          <Button
+            icon="download"
+            onClick={async () => {
+              const path = await pickSave('marquee-letterboxd.csv', [{ name: 'CSV', extensions: ['csv'] }]);
+              if (!path) return;
+              try {
+                const out = await api<{ count: number }>('export.letterboxd', { path });
+                toast(`${out.count.toLocaleString()} films exported for Letterboxd`, 'good');
+              } catch (e) {
+                toast(errorMessage(e), 'bad');
+              }
+            }}
+          >
+            Export for Letterboxd
+          </Button>
+        </Field>
         <Field label="Delete all my data" description="Wipes the database, the cache, backups, custom themes, and every stored sign-in and API key. Connected services are not touched.">
           <Button variant="danger" icon="trash" onClick={() => (setTyped(''), setWipe(true))}>
             Delete everything…

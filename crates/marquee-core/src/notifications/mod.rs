@@ -112,6 +112,17 @@ pub fn near_low(data: &Value) -> bool {
     }
 }
 
+fn cents_text(cents: i64, currency: Option<&str>) -> String {
+    let symbol = match currency.unwrap_or("USD") {
+        "USD" | "CAD" | "AUD" => "$",
+        "EUR" => "€",
+        "GBP" => "£",
+        "JPY" => "¥",
+        _ => "",
+    };
+    format!("{symbol}{}.{:02}", cents / 100, cents % 100)
+}
+
 fn price_text(data: &Value) -> String {
     data["price"]["text"].as_str().map(|t| format!(" ({t})")).unwrap_or_default()
 }
@@ -245,6 +256,25 @@ pub fn generate(ctx: &Ctx) -> Result<usize> {
         }
     }
 
+    // Games that dropped to the price you're waiting for.
+    if s.sales {
+        let mut stmt = conn.prepare(
+            "SELECT i.id, i.title, i.data, t.cents FROM price_targets t JOIN items i ON i.id = t.item_id
+             WHERE json_extract(i.data, '$.price.cents') > 0 AND json_extract(i.data, '$.price.cents') <= t.cents",
+        )?;
+        let hits: Vec<(i64, String, String, i64)> = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?.collect::<rusqlite::Result<_>>()?;
+        for (id, title, data, target) in hits {
+            let data: Value = serde_json::from_str(&data).unwrap_or(Value::Null);
+            let now_cents = data["price"]["cents"].as_i64().unwrap_or(0);
+            let currency = data["price"]["currency"].as_str();
+            let now_text = data["price"]["text"].as_str().map(str::to_string).unwrap_or_else(|| cents_text(now_cents, currency));
+            let body = format!("{title} is down to {now_text}, at or under your {} target.", cents_text(target, currency));
+            if store::add_notification(&conn, "sale", &format!("target:{id}:{now_cents}"), "Price target hit", &body, Some(id))?.is_some() {
+                made += 1;
+            }
+        }
+    }
+
     if s.deals && chrono::Local::now().weekday().num_days_from_monday() == s.digest_day {
         let mut stmt = conn.prepare(
             "SELECT i.title, i.data FROM items i
@@ -368,6 +398,25 @@ mod tests {
             store::record_event(&conn, id, "trakt", EventKind::Watched, 1.0, None, None, &Value::Null).unwrap();
         }
         assert_eq!(generate(&t.ctx).unwrap(), 0, "episode alerts can be turned off");
+    }
+
+    #[test]
+    fn a_game_at_or_under_its_price_target_alerts_once_per_price() {
+        let t = ctx();
+        store::set_setting(&t.ctx.db, "notifications", &NotifySettings { deals: false, digest: false, ..Default::default() }).unwrap();
+        {
+            let conn = t.ctx.db.lock();
+            for (n, (title, cents, target)) in [("Hit", 1499, 1500), ("Miss", 2999, 1500)].into_iter().enumerate() {
+                let mut d = ItemDraft::new(Media::Game, title).id("steam", n as i64 + 1);
+                d.set("price", json!({ "cents": cents, "currency": "USD", "text": format!("${}.{:02}", cents / 100, cents % 100) }));
+                let id = store::upsert_item(&conn, &d).unwrap();
+                conn.execute("INSERT INTO price_targets (item_id, cents, created_at) VALUES (?1, ?2, '')", rusqlite::params![id, target]).unwrap();
+            }
+        }
+        assert_eq!(generate(&t.ctx).unwrap(), 1);
+        assert_eq!(generate(&t.ctx).unwrap(), 0, "not again at the same price");
+        let n = store::notifications(&t.ctx.db.lock(), 10).unwrap();
+        assert_eq!(n[0].body, "Hit is down to $14.99, at or under your $15.00 target.");
     }
 
     #[test]

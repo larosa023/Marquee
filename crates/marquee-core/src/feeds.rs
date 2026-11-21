@@ -283,6 +283,22 @@ pub fn home(ctx: &Ctx) -> Result<Value> {
     )?;
     push(row("wishlist-lows", "Wishlist Deals at Their Lowest", "At or near the lowest price on record", lows));
 
+    // Series you've started: the films you haven't seen yet, oldest first.
+    let rest = query_cards(
+        ctx,
+        &format!(
+            "{NOT_DONE} AND i.media = 'movie' AND i.release_date <= date('now') AND json_extract(i.data, '$.collection.id') IN (
+                SELECT json_extract(x.data, '$.collection.id') FROM items x JOIN user_events e ON e.item_id = x.id
+                WHERE x.media = 'movie' AND e.kind IN ('watched', 'rating') AND json_extract(x.data, '$.collection.id') IS NOT NULL)
+             AND NOT EXISTS (SELECT 1 FROM user_events e WHERE e.item_id = i.id AND e.kind = 'dismiss')"
+        ),
+        &[],
+        "COALESCE(s.score, 0) DESC, i.release_date ASC",
+        20,
+        0,
+    )?;
+    push(row("collections", "Complete the Collection", "The rest of the series you've started", rest));
+
     let wish = query_cards(
         ctx,
         &format!(
@@ -674,6 +690,16 @@ pub async fn detail(ctx: &Ctx, item_id: i64) -> Result<Value> {
         rows
     };
     let features: Vec<Value> = store::item_features(&conn, item_id)?.into_iter().filter(|(f, _)| f.starts_with("t:")).map(|(f, w)| json!({ "feature": f, "label": vocab::label(&f), "weight": w })).collect();
+    let my_note: Option<String> = conn.query_row("SELECT text FROM notes WHERE item_id = ?1", [item_id], |r| r.get(0)).ok();
+    let price_target: Option<i64> = conn.query_row("SELECT cents FROM price_targets WHERE item_id = ?1", [item_id], |r| r.get(0)).ok();
+    // A film in a series: how much of it you've seen, and the rest.
+    let collection = match item.data["collection"]["id"].as_i64() {
+        Some(cid) if item.media == Media::Movie => {
+            let parts = store::cards(&conn, "WHERE i.media = 'movie' AND json_extract(i.data, '$.collection.id') = ?1 ORDER BY i.release_date IS NULL, i.release_date", &[&cid])?;
+            (parts.len() > 1).then(|| json!({ "id": cid, "name": item.data["collection"]["name"], "seen": parts.iter().filter(|c| c.done).count(), "total": parts.len(), "parts": parts }))
+        }
+        _ => None,
+    };
     let connected: Vec<String> = {
         let mut stmt = conn.prepare("SELECT id FROM sources WHERE status != 'disconnected'")?;
         let rows = stmt.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
@@ -724,6 +750,9 @@ pub async fn detail(ctx: &Ctx, item_id: i64) -> Result<Value> {
         "mal": item.ext("mal").map(crate::integrations::mal::anime_url),
         "offline": offline,
         "note": note,
+        "my_note": my_note,
+        "price_target": price_target,
+        "collection": collection,
     }))
 }
 
@@ -1178,6 +1207,29 @@ mod tests {
     }
 
     #[test]
+    fn home_suggests_the_rest_of_a_series_you_started() {
+        let (t, _) = world();
+        {
+            let conn = t.ctx.db.lock();
+            let part = |title: &str, n: i64, date: &str| {
+                let mut d = ItemDraft::new(Media::Movie, title).id("tmdb", 9000 + n);
+                d.release_date = Some(date.into());
+                d.poster = Some("https://image.tmdb.org/t/p/w500/p.jpg".into());
+                d.set("collection", json!({ "id": 726871, "name": "Dune Collection" }));
+                store::upsert_item(&conn, &d).unwrap()
+            };
+            let one = part("Dune", 1, "2021-10-22");
+            part("Dune: Part Two", 2, "2024-03-01");
+            store::record_event(&conn, one, "letterboxd", EventKind::Watched, 1.0, None, None, &Value::Null).unwrap();
+        }
+        crate::sync::rescore(&t.ctx).unwrap();
+        let v = home(&t.ctx).unwrap();
+        let row = v["rows"].as_array().unwrap().iter().find(|r| r["id"] == "collections").expect("the row is there");
+        let titles: Vec<&str> = row["cards"].as_array().unwrap().iter().map(|c| c["title"].as_str().unwrap()).collect();
+        assert_eq!(titles, ["Dune: Part Two"]);
+    }
+
+    #[test]
     fn surprise_and_the_reel_keep_shows_and_anime_apart() {
         let (t, _) = world();
         let anime = {
@@ -1188,6 +1240,7 @@ mod tests {
             a.set("trailer", json!({ "site": "youtube", "key": "k" }));
             store::upsert_item(&conn, &a).unwrap()
         };
+        mark_anime(&t.ctx.db.lock()).unwrap();
         crate::sync::rescore(&t.ctx).unwrap();
         for _ in 0..20 {
             if let Some(c) = surprise_in(&t.ctx, Some(Media::Tv), "exclude", true, &[]).unwrap() {
@@ -1220,6 +1273,7 @@ mod tests {
             store::upsert_item(&conn, &w).unwrap();
             (vec![anime, jp], "Arcane")
         };
+        mark_anime(&t.ctx.db.lock()).unwrap();
         crate::sync::rescore(&t.ctx).unwrap();
         let ids = |v: &Value| v["cards"].as_array().unwrap().iter().map(|c| (c["id"].as_i64().unwrap(), c["title"].as_str().unwrap().to_string())).collect::<Vec<_>>();
         let tv = ids(&hub(&t.ctx, "tv", &Filters::default(), 0, 100).unwrap());

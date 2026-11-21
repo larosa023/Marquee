@@ -113,6 +113,10 @@ export function Art({ card, className, eager, large }: { card: Pick<CardData, 't
   );
 }
 
+/** The card under the pointer (or keyboard focus), for the card shortcuts: 1–5 rate (with ½ via
+ * Shift), 0 clears, S saves, Enter opens. */
+export const pointed: { card: CardData | null; origin: string } = { card: null, origin: '' };
+
 /** Rate straight from a card: stars appear over the poster on hover or keyboard focus. */
 function CardStars({ card }: { card: CardData }) {
   const rate = useRate();
@@ -149,6 +153,9 @@ export const PosterCard = memo(function PosterCard({ card, origin, onContext, wi
   const quickAdd = useQuickAdd();
   const reduce = useReducedMotion();
   const sub = credit(card);
+  // The hover stars are only built once a card is pointed at or focused: a grid of hundreds of
+  // cards shouldn't carry five animated stars each.
+  const [armed, setArmed] = useState(false);
   const context = (e: MouseEvent) => {
     if (!onContext) return;
     e.preventDefault();
@@ -157,6 +164,19 @@ export const PosterCard = memo(function PosterCard({ card, origin, onContext, wi
   return (
     <motion.article
       data-card={card.id}
+      onPointerEnter={() => {
+        setArmed(true);
+        pointed.card = card;
+        pointed.origin = origin;
+      }}
+      onPointerLeave={() => {
+        if (pointed.card?.id === card.id) pointed.card = null;
+      }}
+      onFocusCapture={() => {
+        setArmed(true);
+        pointed.card = card;
+        pointed.origin = origin;
+      }}
       className="group relative shrink-0"
       style={{ width: width ?? 'var(--card-w)' }}
       variants={{ hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0 } }}
@@ -206,7 +226,7 @@ export const PosterCard = memo(function PosterCard({ card, origin, onContext, wi
             )}
           </motion.div>
         </button>
-        <CardStars card={card} />
+        {armed && <CardStars card={card} />}
         <button
           type="button"
           aria-label={card.saved ? `Saved: ${card.title}` : `Save ${card.title}`}

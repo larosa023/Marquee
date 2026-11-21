@@ -151,6 +151,9 @@ export function FilterBar({ value, onChange, media, platforms, hasServices }: Pr
             ]}
           />
         )}
+        <Chip icon="eyeOff" selected={!!value.hide_done} onClick={() => set({ hide_done: !value.hide_done })}>
+          Hide what I've seen
+        </Chip>
         {showScreen && (
           <Chip icon="tv" selected={!!value.my_services} onClick={() => set({ my_services: !value.my_services })}>
             {hasServices ? 'On my services' : 'On my services (choose in Settings)'}
@@ -219,5 +222,5 @@ export function FilterBar({ value, onChange, media, platforms, hasServices }: Pr
 }
 
 export function activeFilterCount(f: Filters): number {
-  return (f.media?.length ?? 0) + (f.genres?.length ?? 0) + (f.album_types?.length ?? 0) + [f.status && f.status !== 'all', f.max_runtime, f.min_runtime, f.my_services, f.on_sale, f.near_low, f.max_price != null, f.platform, f.wishlisted, f.tracking, f.my_artists].filter(Boolean).length;
+  return (f.media?.length ?? 0) + (f.genres?.length ?? 0) + (f.album_types?.length ?? 0) + [f.status && f.status !== 'all', f.max_runtime, f.min_runtime, f.my_services, f.on_sale, f.near_low, f.hide_done, f.max_price != null, f.platform, f.wishlisted, f.tracking, f.my_artists].filter(Boolean).length;
 }

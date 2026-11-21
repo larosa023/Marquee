@@ -2,6 +2,24 @@
 
 All notable changes to Marquee are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.5.0
+
+### Faster
+- **Syncing is quicker.** All your connected services now sync at the same time instead of one after another, so a big Steam library or Trakt history no longer holds up the rest. Title details, tracked shows and followed games are also fetched several at a time.
+- **Ratings feel instant.** Working out whether a title is anime no longer happens on every rating, only when new titles arrive. A full re-score of 20,000 titles takes about a quarter of a second.
+- **Smoother big grids.** The hover stars added in 0.4.0 are only built for cards you point at, instead of for every card on the page.
+
+### Refinements
+- **Rate with the keyboard.** Point at any card (or tab to it) and press 1–5 to rate, Shift+1–5 for a half star, 0 to clear, or S to save it for later.
+- **"Hide what I've seen"** filter on Movies, TV, Anime, Games and Music.
+
+### New
+- **Your notes.** Every title page has a private notes box that saves as you type. Notes stay on this PC and are included in the Letterboxd export.
+- **Price alerts for games.** On a game's page, "Alert me when it's under $X" sends a notification as soon as the price drops to your target (once per new price).
+- **Film series.** A film that's part of a series shows the whole series in order, with how many you've seen. Marquee fetches the other films in any series you've started.
+- **Complete the Collection**, a new Home row: the films you haven't seen yet in series you've started.
+- **Export for Letterboxd.** Settings → Storage → "Film ratings for Letterboxd" saves every film you've watched or rated (here, on Trakt or anywhere else) with your rating, date and notes, in the file Letterboxd's importer reads.
+
 ## 0.4.0
 
 ### Build your taste

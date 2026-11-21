@@ -50,7 +50,7 @@ pub fn merge_items(conn: &Connection, keep: i64, drop: i64) -> Result<()> {
     if keep == drop {
         return Ok(());
     }
-    for table in ["item_ids", "user_events", "list_items", "follows", "price_history", "playtime_log"] {
+    for table in ["item_ids", "user_events", "list_items", "follows", "price_history", "playtime_log", "notes", "price_targets"] {
         conn.execute(&format!("UPDATE OR IGNORE {table} SET item_id = ?1 WHERE item_id = ?2"), params![keep, drop])?;
     }
     conn.execute("UPDATE notifications SET item_id = ?1 WHERE item_id = ?2", params![keep, drop])?;

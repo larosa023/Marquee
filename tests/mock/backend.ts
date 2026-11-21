@@ -44,6 +44,8 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
   const listeners = new Map<string, Set<Handler>>();
   const emit = (event: string, payload: unknown) => listeners.get(event)?.forEach((h) => h(payload));
   const calls: { method: string; params: any }[] = [];
+  const notes = new Map<number, string>();
+  const targetsSet = new Map<number, number>();
 
   let nextId = 1;
   const mk = (media: Media, title: string, days: number, extra: Partial<Card> = {}): Card => {
@@ -256,6 +258,16 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
           .slice(0, p.limit ?? 24);
       case 'today':
         return visible().filter((c) => c.release_date === day(0));
+      case 'note.set':
+        if (p.text) notes.set(p.id, p.text);
+        else notes.delete(p.id);
+        return null;
+      case 'price_target.set':
+        if (p.cents) targetsSet.set(p.id, p.cents);
+        else targetsSet.delete(p.id);
+        return null;
+      case 'export.letterboxd':
+        return { count: 3 };
       case 'item': {
         const card = byId(p.id);
         if (!card) return fail('error', "That title isn't in Marquee anymore.");
@@ -298,6 +310,15 @@ export function createBackend(options: MockOptions = (globalThis as any).__MOCK_
           moods: [{ feature: 't:space', label: 'Space', weight: 1 }],
           targets,
           seriesgraph: card.media === 'tv' ? 'https://seriesgraph.com/show/900' : null,
+          my_note: notes.get(card.id) ?? null,
+          price_target: targetsSet.get(card.id) ?? null,
+          collection:
+            card.media === 'movie'
+              ? (() => {
+                  const parts = catalog.filter((c) => c.media === 'movie').slice(0, 3);
+                  return parts.some((c) => c.id === card.id) ? { id: 1, name: 'The Fixture Saga', seen: parts.filter((c) => c.done).length, total: parts.length, parts } : null;
+                })()
+              : null,
           letterboxd: card.media === 'movie' ? 'https://letterboxd.com/tmdb/900' : null,
           mal: null,
           offline: false,

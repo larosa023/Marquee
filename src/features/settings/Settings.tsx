@@ -439,7 +439,7 @@ function Shortcuts() {
         <Button icon="undo" disabled={Object.keys(overrides).length === 0} onClick={() => setOverrides({})}>
           Reset all
         </Button>
-        <span className="text-[12px] text-faint">Also built in: / for search, F5 to sync, Esc to close, right-click or Shift+F10 for a card's menu.</span>
+        <span className="text-[12px] text-faint">Also built in: / for search, F5 to sync, Esc to close, right-click or Shift+F10 for a card's menu. Point at a card and press 1–5 to rate it (Shift for a half star, 0 clears) or S to save it.</span>
       </div>
     </>
   );

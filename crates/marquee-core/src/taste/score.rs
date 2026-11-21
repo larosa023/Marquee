@@ -250,29 +250,40 @@ pub fn score_all(db: &Db) -> Result<usize> {
         rows
     };
 
-    let mut items: Vec<(i64, Media, Option<String>, String)> = vec![];
+    // Only the creators list is needed from each item's data, not the whole document.
+    let mut items: Vec<(i64, Media, Option<String>, Option<String>)> = vec![];
     {
-        let mut stmt = conn.prepare("SELECT id, media, release_date, data FROM items WHERE media != 'artist'")?;
-        for row in stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, Option<String>>(2)?, r.get::<_, String>(3)?)))? {
-            let (id, media, date, data) = row?;
+        let mut stmt = conn.prepare("SELECT id, media, release_date, json_extract(data, '$.creators') FROM items WHERE media != 'artist'")?;
+        for row in stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, Option<String>>(2)?, r.get::<_, Option<String>>(3)?)))? {
+            let (id, media, date, creators) = row?;
             if let Some(m) = Media::parse(&media) {
-                items.push((id, m, date, data));
+                items.push((id, m, date, creators));
             }
         }
     }
+    // Every item's features in one pass, rather than one query per item.
+    let mut all_feats: HashMap<i64, Vec<(String, f64)>> = HashMap::with_capacity(items.len());
+    {
+        let mut stmt = conn.prepare("SELECT item_id, feature, weight FROM item_features")?;
+        for row in stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, f64>(2)?)))? {
+            let (id, f, w) = row?;
+            all_feats.entry(id).or_default().push((f, w));
+        }
+    }
+    let today_date = chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d").ok();
 
     let tx = conn.unchecked_transaction()?;
     tx.execute("DELETE FROM scores", [])?;
     let mut count = 0;
     {
-        let mut feat_stmt = tx.prepare_cached("SELECT feature, weight FROM item_features WHERE item_id = ?1")?;
         let mut ins = tx.prepare_cached("INSERT INTO scores (item_id, score, match_pct, why, computed_at) VALUES (?1, ?2, ?3, ?4, ?5)")?;
-        for (id, media, date, data) in &items {
-            let feats: Vec<(String, f64)> = feat_stmt.query_map([id], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<rusqlite::Result<_>>()?;
+        let none = vec![];
+        for (id, media, date, creators_json) in &items {
+            let feats: &Vec<(String, f64)> = all_feats.get(id).unwrap_or(&none);
             if dismissed.contains(id) || feats.iter().any(|(f, _)| blocked.contains(f.as_str())) {
                 continue; // no score row = never recommended
             }
-            let mut score = similarity(&profile, &feats, settings.dial);
+            let mut score = similarity(&profile, feats, settings.dial);
             let r = profile.reference;
             if let Some(b) = similar_boost.get(id) {
                 score += 0.12 * r * b;
@@ -282,7 +293,7 @@ pub fn score_all(db: &Db) -> Result<usize> {
             }
             // New and about-to-release titles get a nudge, scaled by how anticipated they are.
             if let Some(d) = date {
-                let days = chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok().zip(chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d").ok()).map(|(a, b)| (a - b).num_days());
+                let days = chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok().zip(today_date).map(|(a, b)| (a - b).num_days());
                 if let Some(days) = days.filter(|d| (-21..=60).contains(d)) {
                     let closeness = 1.0 - (days.abs() as f64 / 60.0);
                     score += 0.08 * r * closeness * pop_rank.get(id).copied().unwrap_or(0.5);
@@ -296,9 +307,19 @@ pub fn score_all(db: &Db) -> Result<usize> {
                     score += settings.dial * 0.10 * r * unexplored;
                 }
             }
-            let creators: HashMap<String, String> =
-                serde_json::from_str::<Value>(data).ok().and_then(|d| d["creators"].as_array().cloned()).unwrap_or_default().iter().filter_map(|c| c["name"].as_str().map(|n| (format!("c:{}", slug(n)), n.to_string()))).collect();
-            let why = if profile.is_empty() { vec![] } else { reasons(*id, *media, &feats, &profile, &evidence, settings.dial, &creators) };
+            let why = if profile.is_empty() {
+                vec![]
+            } else {
+                let creators: HashMap<String, String> = creators_json
+                    .as_deref()
+                    .and_then(|c| serde_json::from_str::<Value>(c).ok())
+                    .and_then(|c| c.as_array().cloned())
+                    .unwrap_or_default()
+                    .iter()
+                    .filter_map(|c| c["name"].as_str().map(|n| (format!("c:{}", slug(n)), n.to_string())))
+                    .collect();
+                reasons(*id, *media, feats, &profile, &evidence, settings.dial, &creators)
+            };
             let pct = if profile.is_empty() || feats.is_empty() { None } else { Some(match_pct(score, r)) };
             ins.execute(params![id, score, pct.unwrap_or(-1), serde_json::to_string(&why)?, now_ts])?;
             count += 1;

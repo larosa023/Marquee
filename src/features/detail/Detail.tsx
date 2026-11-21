@@ -36,6 +36,9 @@ interface DetailData {
   mal: string | null;
   offline: boolean;
   note: string | null;
+  my_note: string | null;
+  price_target: number | null;
+  collection: { id: number; name: string; seen: number; total: number; parts: Card[] } | null;
 }
 
 function Section({ title, children, hint }: { title: string; children: ReactNode; hint?: ReactNode }) {
@@ -580,7 +583,14 @@ export default function Detail({ id }: { id: number }) {
                 </Section>
               )}
 
+              {data.collection && <CollectionStrip collection={data.collection} current={id} />}
+
+              <Section title="Your notes" hint="Private, kept on this PC. Exported with your Letterboxd ratings.">
+                <Notes id={id} initial={data.my_note ?? ''} />
+              </Section>
+
               <Section title="Where to get it">
+                {media === 'game' && <PriceTarget id={id} target={data.price_target} currency={data.where?.steam?.currency ?? data.item.data?.price?.currency} now={data.item.data?.price?.cents ?? null} />}
                 {media === 'game' ? <GameStore where={data.where} title={title} /> : media === 'album' ? <MusicLinks where={data.where} tracks={d.tracks} /> : <Providers where={data.where} />}
                 {(data.letterboxd && media === 'movie') || data.mal ? (
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -728,5 +738,119 @@ export default function Detail({ id }: { id: number }) {
         </label>
       </Modal>
     </motion.div>
+  );
+}
+
+/** A private note, saved as you type. */
+function Notes({ id, initial }: { id: number; initial: string }) {
+  const [text, setText] = useState(initial);
+  const [state, setState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const saved = useRef(initial);
+  useEffect(() => {
+    setText(initial);
+    saved.current = initial;
+  }, [id, initial]);
+  useEffect(() => {
+    if (text === saved.current) return;
+    setState('saving');
+    const t = setTimeout(async () => {
+      await api('note.set', { id, text });
+      saved.current = text;
+      setState('saved');
+    }, 600);
+    return () => clearTimeout(t);
+  }, [text, id]);
+  return (
+    <div className="max-w-3xl">
+      <textarea
+        aria-label="Your notes"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={text ? Math.min(10, text.split('\n').length + 1) : 2}
+        placeholder="What did you think? Who recommended it? Anything you want to remember."
+        className="selectable w-full resize-y rounded-control bg-surface px-3.5 py-2.5 text-[15px] leading-relaxed outline-none ring-1 ring-white/8 placeholder:text-faint focus:ring-accent/60"
+      />
+      <p className="mt-1 h-4 text-[12px] text-faint" aria-live="polite">
+        {state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : ''}
+      </p>
+    </div>
+  );
+}
+
+/** "Tell me when it's under $X." */
+function PriceTarget({ id, target, currency, now }: { id: number; target: number | null; currency?: string; now: number | null }) {
+  const toast = useApp((s) => s.toast);
+  const [value, setValue] = useState(target ? (target / 100).toFixed(2) : '');
+  const [current, setCurrent] = useState(target);
+  const symbol = currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '$';
+  const save = async (cents: number | null) => {
+    try {
+      await api('price_target.set', { id, cents });
+      setCurrent(cents);
+      toast(cents ? `You'll get an alert when it's ${symbol}${(cents / 100).toFixed(2)} or less` : 'Price alert removed', 'good');
+    } catch (e) {
+      toast(errorMessage(e), 'bad');
+    }
+  };
+  return (
+    <form
+      className="mb-4 flex flex-wrap items-center gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const cents = Math.round(parseFloat(value.replace(/[^0-9.]/g, '')) * 100);
+        if (cents > 0) void save(cents);
+      }}
+    >
+      <Icon name="bell" size={16} className="text-subtext" />
+      <label htmlFor={`target-${id}`} className="text-[14px] text-subtext">
+        Alert me when it's under
+      </label>
+      <span className="relative">
+        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtext">{symbol}</span>
+        <input id={`target-${id}`} inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} placeholder={now ? ((now * 0.6) / 100).toFixed(2) : '19.99'} className="tnum h-9 w-28 rounded-control bg-surface pl-6 pr-2 outline-none ring-1 ring-white/8 focus:ring-accent/60" />
+      </span>
+      <Button size="sm" type="submit" variant={current ? 'secondary' : 'primary'}>
+        {current ? 'Update' : 'Set alert'}
+      </Button>
+      {current != null && (
+        <Button
+          size="sm"
+          onClick={() => {
+            setValue('');
+            void save(null);
+          }}
+        >
+          Remove
+        </Button>
+      )}
+    </form>
+  );
+}
+
+/** "You've seen 1 of 3 films in the Dune Collection", with the parts in order. */
+function CollectionStrip({ collection, current }: { collection: NonNullable<DetailData['collection']>; current: number }) {
+  const openItem = useApp((s) => s.openItem);
+  return (
+    <Section title={collection.name || 'The series'} hint={`You've seen ${collection.seen} of ${collection.total}`}>
+      <div className="mb-3 h-1.5 max-w-md overflow-hidden rounded-full bg-strong" role="meter" aria-label="Seen in this series" aria-valuemin={0} aria-valuemax={collection.total} aria-valuenow={collection.seen}>
+        <div className="h-full rounded-full bg-accent" style={{ width: `${(collection.seen / collection.total) * 100}%` }} />
+      </div>
+      <ol className="flex flex-wrap gap-3">
+        {collection.parts.map((c, i) => (
+          <li key={c.id} className="w-24">
+            <button type="button" disabled={c.id === current} onClick={() => openItem(c.id, 'collection')} className={cx('relative block w-full overflow-hidden rounded-control', c.id === current && 'ring-2 ring-accent')} aria-label={`${i + 1}. ${c.title}${c.done ? ', seen' : ''}`}>
+              <Art card={c} className="aspect-2/3 w-full" />
+              {c.done && (
+                <span className="absolute bottom-1 left-1 grid h-5 w-5 place-items-center rounded-full bg-black/70 text-good">
+                  <Icon name="check" size={12} />
+                </span>
+              )}
+            </button>
+            <p className="mt-1 truncate text-[12px] font-medium">{c.title}</p>
+            <p className="tnum text-[11px] text-subtext">{c.release_date?.slice(0, 4) ?? 'TBA'}</p>
+          </li>
+        ))}
+      </ol>
+    </Section>
   );
 }

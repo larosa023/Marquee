@@ -8,7 +8,8 @@ import { useHotkeys } from './lib/hotkeys';
 import { appearanceFrom, applyScale, applyTheme, resolveTheme } from './lib/theme';
 import type { Bootstrap } from './lib/types';
 import { navigation, useApp, type SystemInfo, type UpdateInfo } from './state/app';
-import { refreshFeeds } from './ui/actions';
+import { refreshFeeds, useQuickAdd, useRate } from './ui/actions';
+import { pointed } from './ui/Card';
 import { Logo } from './ui/Logo';
 import { Modal, Toasts } from './ui/overlays';
 import { Button, ErrorState, Skeleton } from './ui/primitives';
@@ -298,6 +299,32 @@ function Shell() {
   }, [path, item]);
 
   const go = useApp((s) => s.navigate);
+  // Card shortcuts: point at (or focus) any card, then 1–5 to rate (Shift adds a half star),
+  // 0 to clear, S to save for later.
+  const rateCard = useRate();
+  const saveCard = useQuickAdd();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const card = pointed.card;
+      if (!card || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable || t.getAttribute('role') === 'slider')) return;
+      if (useApp.getState().item != null || document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      const digit = /^Digit([0-5])$/.exec(e.code);
+      if (digit) {
+        e.preventDefault();
+        const n = Number(digit[1]);
+        const stars = n === 0 ? 0 : e.shiftKey ? n - 0.5 : n;
+        void rateCard(card, stars);
+      } else if (e.key.toLowerCase() === 's' && !e.shiftKey) {
+        e.preventDefault();
+        void saveCard(card);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [rateCard, saveCard]);
+
   useHotkeys(boot?.settings['shortcuts'], {
     palette: () => useApp.getState().setPalette(!useApp.getState().paletteOpen),
     search: () => go('/search'),

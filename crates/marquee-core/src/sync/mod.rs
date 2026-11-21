@@ -493,11 +493,11 @@ async fn refresh_tracked(ctx: &Ctx) -> Result<()> {
         let franchises = stmt.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
         (shows, games, franchises)
     };
-    for id in shows.into_iter().chain(games) {
-        match catalog::ensure_detail(ctx, id).await {
-            Err(e) if e.is_offline() => return Err(e),
-            _ => {}
-        }
+    // Several at a time; the shared scheduler keeps each site within its limits.
+    use futures::StreamExt;
+    let results: Vec<Result<()>> = futures::stream::iter(shows.into_iter().chain(games)).map(|id| catalog::ensure_detail(ctx, id)).buffer_unordered(6).collect().await;
+    if let Some(Err(e)) = results.into_iter().find(|r| matches!(r, Err(e) if e.is_offline())) {
+        return Err(e);
     }
     for collection in franchises {
         if let Ok(parts) = catalog::tmdb::collection(ctx, &collection).await {
@@ -511,9 +511,41 @@ async fn refresh_tracked(ctx: &Ctx) -> Result<()> {
     Ok(())
 }
 
+/// Film series you've started (you watched or rated one part): fetch the other parts so
+/// "Complete the Collection" and each film's page can show the rest.
+pub async fn refresh_collections(ctx: &Ctx) -> Result<usize> {
+    if !ctx.has_key("tmdb") {
+        return Ok(0);
+    }
+    let started: Vec<(i64, String)> = {
+        let conn = ctx.db.lock();
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT json_extract(i.data, '$.collection.id'), json_extract(i.data, '$.collection.name') FROM items i JOIN user_events e ON e.item_id = i.id
+             WHERE i.media = 'movie' AND e.kind IN ('watched', 'rating') AND json_extract(i.data, '$.collection.id') IS NOT NULL LIMIT 40",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1).unwrap_or_default())))?.filter_map(|r| r.ok()).collect();
+        rows
+    };
+    let mut saved = 0;
+    for (cid, name) in started {
+        match catalog::tmdb::collection(ctx, &cid.to_string()).await {
+            Ok(parts) => {
+                let ids = catalog::save_all(ctx, &parts)?;
+                let conn = ctx.db.lock();
+                for id in &ids {
+                    conn.execute("UPDATE items SET data = json_set(data, '$.collection', json(?1)) WHERE id = ?2", rusqlite::params![json!({ "id": cid, "name": name }).to_string(), id])?;
+                }
+                saved += ids.len();
+            }
+            Err(e) if e.is_offline() => return Err(e),
+            Err(e) => tracing::debug!("collection {cid}: {e}"),
+        }
+    }
+    Ok(saved)
+}
+
 /// Rebuilds the taste profile and every score. Fast enough to run after any rating.
 pub fn rescore(ctx: &Ctx) -> Result<usize> {
-    crate::feeds::mark_anime(&ctx.db.lock())?;
     taste::profile::rebuild(&ctx.db)?;
     let n = taste::score::score_all(&ctx.db)?;
     ctx.emit("taste:updated", json!({ "scored": n }));
@@ -566,10 +598,28 @@ pub async fn run(ctx: &Ctx, only: Option<&str>) -> Result<SyncReport> {
         let conn = ctx.db.lock();
         integrations::all().into_iter().filter(|s| only.map(|o| o == s.id()).unwrap_or(true)).filter(|s| store::is_connected(&conn, s.id())).collect()
     };
+    // Every connected service at once: each waits on its own website, so a slow one (a big Steam
+    // library, say) no longer holds up the rest. Writes still take turns on the database.
     let n = connected.len().max(1) as f64;
-    for (i, src) in connected.iter().enumerate() {
-        progress(ctx, &format!("Syncing {}", src.name()), 0.02 + 0.28 * (i as f64 / n));
-        sync_source(ctx, src.as_ref(), &mut report).await;
+    let done = std::sync::atomic::AtomicUsize::new(0);
+    let names = connected.iter().map(|s| s.name()).collect::<Vec<_>>().join(", ");
+    progress(ctx, &format!("Syncing {names}"), 0.02);
+    let parts = futures::future::join_all(connected.iter().map(|src| {
+        let done = &done;
+        async move {
+            let mut part = SyncReport::default();
+            sync_source(ctx, src.as_ref(), &mut part).await;
+            let k = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+            progress(ctx, &format!("Synced {}", src.name()), 0.02 + 0.28 * (k as f64 / n));
+            part
+        }
+    }))
+    .await;
+    for part in parts {
+        report.events += part.events;
+        report.offline |= part.offline;
+        report.warnings.extend(part.warnings);
+        report.sources.extend(part.sources);
     }
 
     if only.is_none() && !report.offline {
@@ -590,6 +640,9 @@ pub async fn run(ctx: &Ctx, only: Option<&str>) -> Result<SyncReport> {
             if let Err(e) = refresh_tracked(ctx).await {
                 report.offline |= e.is_offline();
             }
+            if let Err(e) = refresh_collections(ctx).await {
+                report.offline |= e.is_offline();
+            }
             if let Err(e) = crate::backlog::refresh_lengths(ctx).await {
                 tracing::debug!("couldn't look up game lengths: {e}");
             }
@@ -597,6 +650,8 @@ pub async fn run(ctx: &Ctx, only: Option<&str>) -> Result<SyncReport> {
     }
 
     progress(ctx, "Scoring picks for you", 0.88);
+    // New and newly detailed titles: is it anime? (Kept out of rescore, which runs on every rating.)
+    crate::feeds::mark_anime(&ctx.db.lock())?;
     report.scored = rescore(ctx)?;
     if only.is_none() && !report.offline {
         // Give the best upcoming picks full details (trailers, providers, better reasons), then rescore.
@@ -610,14 +665,8 @@ pub async fn run(ctx: &Ctx, only: Option<&str>) -> Result<SyncReport> {
             let rows = stmt.query_map([days_from_today(-30)], |r| r.get(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
             rows
         };
-        let mut fetched = 0;
-        for id in top {
-            match catalog::ensure_detail(ctx, id).await {
-                Ok(()) => fetched += 1,
-                Err(e) if e.is_offline() => break,
-                Err(_) => {}
-            }
-        }
+        use futures::StreamExt;
+        let fetched = futures::stream::iter(top).map(|id| async move { catalog::ensure_detail(ctx, id).await.is_ok() }).buffer_unordered(8).filter(|ok| futures::future::ready(*ok)).count().await;
         if fetched > 0 {
             report.scored = rescore(ctx)?;
         }

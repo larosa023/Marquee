@@ -622,6 +622,35 @@ pub async fn dispatch(ctx: &Arc<Ctx>, method: &str, p: Value) -> Result<Value> {
             sync::rescore(c)?;
             out
         }
+        "note.set" => {
+            let id = int(&p, "id")?;
+            let text = opt(&p, "text").map(str::trim).unwrap_or("");
+            let conn = c.db.lock();
+            if text.is_empty() {
+                conn.execute("DELETE FROM notes WHERE item_id = ?1", [id])?;
+            } else {
+                conn.execute("INSERT INTO notes (item_id, text, updated_at) VALUES (?1, ?2, ?3) ON CONFLICT (item_id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at", rusqlite::params![id, text, now()])?;
+            }
+            Value::Null
+        }
+        "price_target.set" => {
+            let id = int(&p, "id")?;
+            let conn = c.db.lock();
+            match p["cents"].as_i64().filter(|c| *c > 0) {
+                Some(cents) => {
+                    conn.execute("INSERT INTO price_targets (item_id, cents, created_at) VALUES (?1, ?2, ?3) ON CONFLICT (item_id) DO UPDATE SET cents = excluded.cents", rusqlite::params![id, cents, now()])?;
+                }
+                None => {
+                    conn.execute("DELETE FROM price_targets WHERE item_id = ?1", [id])?;
+                }
+            }
+            Value::Null
+        }
+        "export.letterboxd" => {
+            let (body, count) = export::letterboxd_csv(c)?;
+            std::fs::write(text(&p, "path")?, body)?;
+            json!({ "count": count })
+        }
         "export.library" => {
             let body = if opt(&p, "format") == Some("json") { export::library_json(c)? } else { export::library_csv(c)? };
             std::fs::write(text(&p, "path")?, body)?;
